@@ -1,0 +1,62 @@
+{% from "macros/svg.html" import radar_svg, rosace_svg with context %}
+<div id="score-panel" data-fonction-actuelle="{{ filters.fonction or '' }}">
+  <div class="panel__header">
+    <h2>{{ quartier.properties.nom if quartier else "Toute la ville" }}</h2>
+    <span class="mono" style="color: var(--color-text-faint); font-size: 0.85rem;">
+      {{ modes[filters.mode] }} · {{ filters.duree }} min
+    </span>
+  </div>
+
+  <div class="panel__stat">
+    <span class="panel__stat-label">Score HQVS pondéré (densité de population)</span>
+    <span class="panel__stat-value {{ panel.pondere | score_class }}">{{ panel.pondere if panel.pondere is not none else "—" }}<span style="font-size:1rem; color:var(--color-text-faint);"> / 10</span></span>
+    <span class="panel__stat-sub">Score brut (non pondéré) : {{ panel.brut if panel.brut is not none else "—" }} / 10 · {{ panel.n_cellules }} cellules · {{ "%.0f"|format(panel.population_totale) }} hab.</span>
+  </div>
+
+  {% if a_ameliorer %}
+  <p class="note" style="border-color: var(--score-0);">
+    <strong style="color: var(--score-0-text);">À améliorer :</strong> {{ fonctions_labels[a_ameliorer[0]] }} ({{ a_ameliorer[1] }}/10)
+    {% if mieux_desservi %} · <strong style="color: var(--score-9-text);">Mieux desservi :</strong> {{ fonctions_labels[mieux_desservi[0]] }} ({{ mieux_desservi[1] }}/10){% endif %}
+  </p>
+  {% endif %}
+
+  <div class="svg-widgets">
+    <div class="svg-widget">
+      <h4>Rosace des proximités <span class="help-icon" tabindex="0" aria-label="Aide">?<span class="visually-hidden">Cliquer un secteur filtre la carte et les équipements affichés sur cette fonction. Cliquer le centre réinitialise le filtre.</span></span></h4>
+      {{ rosace_svg(radar.valeurs, filters.fonction, 260) }}
+    </div>
+    <div class="svg-widget">
+      <h4>Radar des 6 fonctions <span class="help-icon" tabindex="0" aria-label="Aide">?<span class="visually-hidden">Score de 0 à 10 pour chacune des 6 fonctions sociales, sur le territoire sélectionné.</span></span></h4>
+      {{ radar_svg(radar.valeurs, fonctions_labels, 260) }}
+    </div>
+  </div>
+
+  {% if radar.est_approximation %}
+  <p class="note">
+    Radar en <strong>{{ modes[filters.mode] }} {{ filters.duree }} min</strong> : les données sources ne détaillent le score par fonction que pour un mode de référence.
+    Les valeurs ci-dessus sont donc une <strong>approximation</strong> (mise à l'échelle par le ratio {{ radar.ratio_approximation }} entre le score global de ce mode/durée et le score global de référence) — voir <a href="/methodologie#radar-approximation">Méthodologie</a>.
+  </p>
+  {% endif %}
+
+  {% if not isochrone_disponible %}
+  <p class="note">Le contour d'isochrone n'est disponible que pour <strong>marche · 15 min</strong> (seule géométrie fournie dans les données). La carte affiche ici la choroplèthe seule — voir <a href="/methodologie#isochrones">Méthodologie</a>.</p>
+  {% endif %}
+
+  {% if combinee_15_30 is not none %}
+  <p class="note">Score combiné 15/30 min (moyenne géométrique, proposition ouverte) : <strong>{{ combinee_15_30 }} / 10</strong></p>
+  {% endif %}
+
+  <details class="accordion">
+    <summary>Détails par fonction (tableau)</summary>
+    <div class="accordion__body">
+      <table class="data-table">
+        <thead><tr><th>Fonction</th><th>Score</th><th>Niveau</th></tr></thead>
+        <tbody>
+        {% for f, label in fonctions_labels.items() %}
+          <tr><td>{{ label }}</td><td class="mono">{{ radar.valeurs[f] if radar.valeurs[f] is not none else "—" }}</td><td>{{ radar.valeurs[f] | score_label }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</div>

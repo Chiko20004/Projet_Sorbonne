@@ -1,0 +1,68 @@
+{% macro radar_svg(values, fonctions_labels, size=280) %}
+{% set cx = size / 2 %}
+{% set cy = size / 2 %}
+{% set max_r = size * 0.34 %}
+{% set label_r = size * 0.44 %}
+<svg viewBox="0 0 {{ size }} {{ size }}" width="100%" height="100%" role="img"
+     aria-label="Radar des 6 fonctions sociales : {% for f, dx, dy in radar_axes %}{{ fonctions_labels[f] }} {{ values[f] if values[f] is not none else 'donnée indisponible' }}{{ ', ' if not loop.last }}{% endfor %}.">
+  <g>
+    {% for ring in [2, 4, 6, 8, 10] %}
+    <polygon
+      points="{% for f, dx, dy in radar_axes %}{{ (cx + dx * max_r * ring / 10) | round(1) }},{{ (cy + dy * max_r * ring / 10) | round(1) }}{{ ' ' if not loop.last }}{% endfor %}"
+      fill="none" stroke="var(--color-border-strong)" stroke-width="1" />
+    {% endfor %}
+    {% for f, dx, dy in radar_axes %}
+    <line x1="{{ cx }}" y1="{{ cy }}" x2="{{ (cx + dx * max_r) | round(1) }}" y2="{{ (cy + dy * max_r) | round(1) }}"
+          stroke="var(--color-border-strong)" stroke-width="1" />
+    {% endfor %}
+    <polygon
+      points="{% for f, dx, dy in radar_axes %}{% set v = values[f] if values[f] is not none else 0 %}{{ (cx + dx * max_r * v / 10) | round(1) }},{{ (cy + dy * max_r * v / 10) | round(1) }}{{ ' ' if not loop.last }}{% endfor %}"
+      fill="var(--color-corail-text)" fill-opacity="0.35" stroke="var(--color-corail-text)" stroke-width="2" />
+    {% for f, dx, dy in radar_axes %}
+      {% set v = values[f] %}
+      {% if v is not none %}
+      <circle cx="{{ (cx + dx * max_r * v / 10) | round(1) }}" cy="{{ (cy + dy * max_r * v / 10) | round(1) }}" r="3.5" fill="var(--color-or)" />
+      {% endif %}
+      <text class="rosace-label" x="{{ (cx + dx * label_r) | round(1) }}" y="{{ (cy + dy * label_r) | round(1) }}"
+            text-anchor="{{ 'middle' if dx|abs < 0.3 else ('start' if dx > 0 else 'end') }}"
+            dominant-baseline="{{ 'baseline' if dy < -0.3 else ('hanging' if dy > 0.3 else 'middle') }}">
+        {{ fonctions_labels[f] }}
+      </text>
+    {% endfor %}
+  </g>
+</svg>
+{% endmacro %}
+
+{% macro rosace_svg(values, active_fonction, size=280) %}
+{% set cx = size / 2 %}
+{% set cy = size / 2 %}
+{% set min_r = size * 0.14 %}
+{% set max_r = size * 0.42 %}
+<svg viewBox="0 0 {{ size }} {{ size }}" width="100%" height="100%" role="group"
+     aria-label="Rosace des proximités : cliquer un secteur pour filtrer la carte sur cette fonction, cliquer le centre pour réinitialiser.">
+  {% for f, e0, e1 in rosace_wedges %}
+    {% set v = values[f] if values[f] is not none else 0 %}
+    {% set r = min_r + (max_r - min_r) * v / 10 %}
+    {% set x0 = (cx + e0[0] * r) | round(1) %}{% set y0 = (cy + e0[1] * r) | round(1) %}
+    {% set x1 = (cx + e1[0] * r) | round(1) %}{% set y1 = (cy + e1[1] * r) | round(1) %}
+    {% set ix0 = (cx + e0[0] * min_r) | round(1) %}{% set iy0 = (cy + e0[1] * min_r) | round(1) %}
+    {% set ix1 = (cx + e1[0] * min_r) | round(1) %}{% set iy1 = (cy + e1[1] * min_r) | round(1) %}
+    <path class="rosace-sector" data-fonction="{{ f }}"
+          d="M{{ ix0 }},{{ iy0 }} L{{ x0 }},{{ y0 }} A{{ r }},{{ r }} 0 0 1 {{ x1 }},{{ y1 }} L{{ ix1 }},{{ iy1 }} A{{ min_r }},{{ min_r }} 0 0 0 {{ ix0 }},{{ iy0 }} Z"
+          fill="{{ values[f] | score_color }}" fill-opacity="{{ '1' if (active_fonction == f or not active_fonction) else '0.35' }}"
+          stroke="var(--color-bg-card)" stroke-width="1.5"
+          role="button" tabindex="0" aria-pressed="{{ 'true' if active_fonction == f else 'false' }}"
+          aria-label="{{ fonctions_labels_g[f] }} : {{ values[f] if values[f] is not none else 'donnée indisponible' }} sur 10, {{ values[f] | score_label }}. Filtrer la carte sur cette fonction." />
+  {% endfor %}
+  <circle class="rosace-center" data-fonction="" cx="{{ cx }}" cy="{{ cy }}" r="{{ min_r - 2 }}"
+          fill="var(--color-bg-elevated)" stroke="var(--color-border-strong)" stroke-width="1.5"
+          role="button" tabindex="0" aria-label="Réinitialiser le filtre par fonction" />
+  {% for f, dx, dy in radar_axes %}
+  <text class="rosace-label" x="{{ (cx + dx * (max_r + 14)) | round(1) }}" y="{{ (cy + dy * (max_r + 14)) | round(1) }}"
+        text-anchor="{{ 'middle' if dx|abs < 0.3 else ('start' if dx > 0 else 'end') }}"
+        dominant-baseline="{{ 'baseline' if dy < -0.3 else ('hanging' if dy > 0.3 else 'middle') }}">
+    {{ fonctions_labels_g[f] }}
+  </text>
+  {% endfor %}
+</svg>
+{% endmacro %}

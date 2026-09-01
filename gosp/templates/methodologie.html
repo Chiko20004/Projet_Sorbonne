@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+{% from "macros/page_hero.html" import grain_banner %}
+{% block title %}Méthodologie — GOSP Sète{% endblock %}
+{% block content %}
+{{ grain_banner("Méthodologie", "Cette page documente la méthode HQSL, la formule du score HQVS telle qu'implémentée ici, et — de façon transparente — ses limites et les choix pris faute de données disponibles.") }}
+<div class="page-section page-section--narrow">
+  <h2>Les 6 fonctions sociales</h2>
+  <p>La méthode HQSL (Haute Qualité de Vie Sociétale, Pr. Carlos Moreno) évalue l'accès du
+    quotidien à six fonctions :</p>
+  <ul>
+    {% for f, label in fonctions.items() %}<li><strong>{{ label }}</strong></li>{% endfor %}
+  </ul>
+
+  <h2>Les 3 niveaux de proximité</h2>
+  <ul>
+    {% for n, label in niveaux.items() %}<li><strong>{{ label }}</strong></li>{% endfor %}
+  </ul>
+  <p>Chaque équipement est classé dans un ou plusieurs niveaux et fonctions via
+    <code>bpe24key_classification.csv</code> (typologie officielle de la Base Permanente des
+    Équipements 2024).</p>
+
+  <h2>Score HQVS : formule</h2>
+  <p>Pour un mode de transport et une durée donnés, chaque bâtiment/cellule reçoit un score de
+    0 à 10 par fonction, à partir du temps d'accès réel aux équipements pertinents (mesure de
+    distance/temps, pas de la capacité d'accueil des bâtiments — donnée non disponible). Le
+    score global est la moyenne des 6 scores fonction.</p>
+
+  <h3 id="score-pondere">Score pondéré par densité de population (nouveau)</h3>
+  <p>Le pipeline existant n'intègre pas la densité de population dans le score agrégé d'un
+    territoire : un score élevé sur une zone peu peuplée compte alors autant qu'un score élevé
+    sur une zone dense. Ce site introduit un second indicateur, le <strong>score pondéré</strong>,
+    calculé comme une moyenne des scores des cellules de la grille 200 m, pondérée par la
+    population de chaque cellule :</p>
+  <p class="mono note">score_pondéré = Σ(score_cellule × population_cellule) / Σ(population_cellule)</p>
+  <p>Le score brut (moyenne arithmétique simple) reste affiché à côté, pour comparaison. C'est
+    une proposition méthodologique nouvelle de ce projet, pas le comportement historique du
+    pipeline HQVS.</p>
+
+  <h3 id="radar-approximation">Radar par fonction et filtre mode/durée (approximation)</h3>
+  <p>Les données sources fournissent un score par fonction (Habiter, Apprendre, …) sous une
+    forme <strong>non ventilée par mode/durée</strong>, et séparément un score global par
+    combinaison mode/durée (marche 15, marche 30, vélo 15/30, voiture 15/30) — mais pas la
+    matrice croisée des deux. Quand vous changez de mode ou de durée sur la page Exploration,
+    le radar affiche donc une <strong>approximation</strong> : chaque score de fonction de
+    référence est mis à l'échelle par le ratio entre le score global du mode/durée choisi et le
+    score global de référence. Cela préserve la forme relative du radar (quelles fonctions sont
+    mieux ou moins bien desservies) mais n'est pas une mesure directe — une ventilation
+    complète nécessiterait un recalcul en amont, hors du périmètre des données fournies.</p>
+
+  <h3>Combinaison 15 min / 30 min (proposition ouverte)</h3>
+  <p>Le score par palier de proximité (15 min vs 30 min) reste indépendant par défaut : vous
+    choisissez une durée précise. Pour un indicateur "toutes proximités" optionnel, ce site
+    propose une <strong>moyenne géométrique</strong> entre les scores 15 et 30 min du même
+    mode plutôt qu'une moyenne arithmétique, car elle pénalise davantage un déséquilibre (bonne
+    proximité étendue mais mauvaise proximité locale, ou l'inverse). Ce n'est pas une norme
+    validée par la Chaire ETI — c'est une proposition ouverte, documentée ici pour discussion.</p>
+
+  <h2 id="isochrones">Isochrones : ce qui est réellement disponible</h2>
+  <p>Le jeu de données fourni contient un seul fichier de géométries d'isochrones,
+    <code>isochrones_walking_15min.geojson</code> : un polygone par équipement (zone d'où cet
+    équipement est atteignable à pied en 15 min), pas par quartier ni par point choisi
+    librement. C'est la <strong>seule</strong> combinaison mode/durée avec une géométrie
+    réelle. Les 5 autres combinaisons (marche 30, vélo 15/30, voiture 15/30) existent comme
+    scores agrégés (bâtiment, grille, quartier) mais sans polygone associé.</p>
+  <p>Choix retenu : la carte affiche un contour d'isochrone uniquement en <strong>marche
+    15 min</strong>, autour de l'équipement cliqué. Pour les autres combinaisons, seule la
+    choroplèthe (scores réels) est affichée. Aucun polygone n'est approximé ou inventé pour
+    combler ce manque.</p>
+
+  <h2>Unité spatiale : grille plutôt qu'IRIS</h2>
+  <p>Aucun découpage IRIS n'a été fourni pour Sète. La carte propose donc trois unités
+    spatiales, toutes présentes dans les données :</p>
+  <ul>
+    {% for u, label in unites.items() %}<li><strong>{{ label }}</strong></li>{% endfor %}
+  </ul>
+  <p><strong>Recommandation :</strong> la grille 200 m par défaut. La grille 50 m est plus fine
+    mais contient de nombreuses cellules à très faible population, où un score élevé est peu
+    significatif statistiquement ; la grille 200 m suit la convention de carroyage INSEE et
+    offre un meilleur équilibre lisibilité/poids de rendu. Les conseils de quartier restent
+    disponibles pour une vue agrégée, comme sur le site précédent.</p>
+
+  <h2>Ce qui n'est pas implémenté</h2>
+  <ul>
+    <li><strong>Pondération poids_hqvs / tier_rarete</strong> : ces colonnes existent bien
+      dans la table de classification de la base de production, mais sont absentes de
+      l'extrait pédagogique (<code>bpe24key_classification.csv</code>) et ne sont, à notre
+      connaissance, branchées sur aucune méthode de scoring en amont. Cette pondération par
+      rareté d'équipement n'est donc pas implémentée ici ; elle nécessiterait un fichier de
+      classification enrichi.</li>
+    <li><strong>Transport en commun</strong> : absent des isochrones fournies (marche, vélo,
+      voiture uniquement).</li>
+    <li><strong>Capacité d'accueil des bâtiments</strong> : le score mesure un temps d'accès,
+      pas une capacité — aucune donnée de capacité n'existe dans les fichiers fournis.</li>
+  </ul>
+
+  <h2>Sources de données</h2>
+  <ul>
+    <li>Bâtiments et scores HQVS par bâtiment (9 910 bâtiments)</li>
+    <li>Base Permanente des Équipements (BPE) 2024 + complément OpenStreetMap (17 386 équipements)</li>
+    <li>Grilles de carroyage 50 m et 200 m (peuplées et non peuplées)</li>
+    <li>Conseils de quartier de Sète (7 quartiers)</li>
+    <li>Isochrones marche 15 min (16 785 polygones, un par équipement)</li>
+  </ul>
+</div>
+{% endblock %}

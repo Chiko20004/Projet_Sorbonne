@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% from "macros/page_hero.html" import grain_banner %}
+{% block title %}Fiches quartier — GOSP Sète{% endblock %}
+{% block content %}
+{{ grain_banner("Fiches quartier", "Score HQVS et radar des 6 fonctions pour chacun des 7 conseils de quartier de Sète.") }}
+<div class="page-section">
+  <div class="card-grid">
+    {% for q in quartiers %}
+    <a class="card card--quartier" href="/quartiers/{{ q.properties.id }}">
+      <h3>{{ q.properties.nom }}</h3>
+      <span class="card__score {{ q.properties.score_global | score_class }}">{{ q.properties.score_global if q.properties.score_global is not none else "—" }} / 10</span>
+      <span style="color: var(--color-text-faint); font-size: 0.85rem;">{{ "%.0f"|format(q.properties.population) if q.properties.population else "—" }} hab. · {{ q.properties.surf_km2 if q.properties.surf_km2 is not none else "—" }} km²</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

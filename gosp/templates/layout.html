@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}GOSP — Proximités du quotidien à Sète{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Observatoire des proximités du quotidien à Sète : score HQVS, méthodologie HQSL et carte interactive, portés par la Chaire ETI (IAE Paris-Sorbonne), UN-Habitat et UCLG.{% endblock %}">
+<meta property="og:title" content="{% block og_title %}GOSP — Proximités du quotidien à Sète{% endblock %}">
+<meta property="og:description" content="{% block og_description %}Observatoire mondial des proximités durables : méthodologie HQSL, score HQVS et exploration cartographique de Sète.{% endblock %}">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧭</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+{% block extra_head %}{% endblock %}
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="/">
+      <span class="brand__mark" aria-hidden="true">🧭</span>
+      <span class="brand__text">
+        <strong>GOSP</strong>
+        <small>Proximités du quotidien — Sète</small>
+      </span>
+    </a>
+    <nav class="site-nav" aria-label="Navigation principale">
+      {% for section in nav_sections %}
+      <div class="site-nav__group">
+        <span class="site-nav__group-label">{{ section.label }}</span>
+        <ul>
+          {% for link in section.links %}
+          <li><a href="{{ link.href }}" {% if request.path==link.href %}aria-current="page"{% endif %}>{{ link.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Global Observatory of Sustainable Proximities (GOSP) — porté par la <strong>Chaire ETI</strong> (IAE Paris-Sorbonne), <strong>UN-Habitat</strong> et <strong>UCLG</strong>, méthodologie HQSL (Pr. Carlos Moreno).</p>
+    <p class="site-footer__meta">Jeu de données : Sète et alentours, 2024. <a href="/methodologie">Méthodologie</a> · <a href="/documentation">Documentation</a></p>
+  </div>
+</footer>
+</body>
+</html>

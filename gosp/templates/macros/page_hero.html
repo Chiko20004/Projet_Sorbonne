@@ -1,0 +1,11 @@
+{% macro grain_banner(title, subtitle=None) %}
+<section class="hero hero--grain">
+  <div class="hero__grain-layer" aria-hidden="true"></div>
+  <div class="hero__grain-noise" aria-hidden="true"></div>
+  <div class="hero__scrim" aria-hidden="true"></div>
+  <div class="hero__inner">
+    <h1 class="fade-up fade-up-1">{{ title }}</h1>
+    {% if subtitle %}<p class="hero__lede fade-up fade-up-2">{{ subtitle }}</p>{% endif %}
+  </div>
+</section>
+{% endmacro %}

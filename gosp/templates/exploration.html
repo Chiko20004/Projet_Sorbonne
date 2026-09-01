@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+{% from "macros/page_hero.html" import grain_banner %}
+{% block title %}Exploration interactive — GOSP Sète{% endblock %}
+{% block meta_description %}Carte interactive des proximités du quotidien à Sète : rosace, radar des 6 fonctions sociales, score HQVS et choroplèthe par grille ou quartier.{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script defer src="{{ url_for('static', filename='js/rosace.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/map.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+{{ grain_banner("Exploration interactive", "Rosace, radar et carte se mettent à jour ensemble à chaque changement de filtre. Cliquez un secteur de la rosace pour filtrer la carte sur une fonction, ou le centre pour réinitialiser.") }}
+<div class="page-section">
+  <form id="filters-form" class="filters"
+        hx-get="{{ url_for('exploration.exploration_panel') }}"
+        hx-trigger="change"
+        hx-target="#score-panel"
+        hx-swap="outerHTML">
+    <div class="field">
+      <label for="f-territoire">Territoire</label>
+      <select id="f-territoire" name="territoire">
+        <option value="">Toute la ville</option>
+        {% for q in quartiers %}
+        <option value="{{ q.properties.id }}" {{ "selected" if filters.territoire == q.properties.id|string }}>{{ q.properties.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-mode">Mode de transport</label>
+      <select id="f-mode" name="mode">
+        {% for value, label in modes.items() %}
+        <option value="{{ value }}" {{ "selected" if filters.mode == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-duree">Durée</label>
+      <select id="f-duree" name="duree">
+        {% for d in durees %}
+        <option value="{{ d }}" {{ "selected" if filters.duree == d }}>{{ d }} min</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-unite">
+        Unité spatiale
+        <span class="help-icon" tabindex="0" aria-label="Aide unité spatiale">?<span class="visually-hidden">Grille 200 m recommandée (pas d'IRIS disponible pour Sète) ; grille 50 m plus détaillée mais plus lourde ; conseils de quartier pour une vue agrégée. Voir Méthodologie.</span></span>
+      </label>
+      <select id="f-unite" name="unite">
+        {% for value, label in unites.items() %}
+        <option value="{{ value }}" {{ "selected" if filters.unite == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-niveau">Niveau de proximité</label>
+      <select id="f-niveau" name="niveau">
+        <option value="">Tous niveaux</option>
+        {% for value, label in niveaux.items() %}
+        <option value="{{ value }}" {{ "selected" if filters.niveau == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <input type="hidden" id="f-fonction" name="fonction" value="{{ filters.fonction or '' }}">
+  </form>
+
+  <div class="exploration-grid" style="margin-top: 1.5rem;">
+    <div class="panel">
+      {% include "fragments/score_panel.html" %}
+    </div>
+    <div>
+      <div id="map" class="map-container" role="application" aria-label="Carte interactive des proximités"></div>
+      <div class="legend" style="margin-top: 1rem;">
+        <strong>Score HQVS</strong>
+        <div class="legend__row"><span class="legend__swatch" style="background: var(--score-0);"></span> 0–3 très faible</div>
+        <div class="legend__row"><span class="legend__swatch" style="background: var(--score-3);"></span> 3–5 faible</div>
+        <div class="legend__row"><span class="legend__swatch" style="background: var(--score-5);"></span> 5–7 moyen</div>
+        <div class="legend__row"><span class="legend__swatch" style="background: var(--score-7);"></span> 7–9 bon</div>
+        <div class="legend__row"><span class="legend__swatch" style="background: var(--score-9);"></span> 9–10 très bon</div>
+        <div class="legend__row"><span class="legend__swatch" style="background: var(--score-nodata);"></span> Cellule non peuplée / donnée indisponible</div>
+        <p class="note" style="margin-top: 0.5rem;">Seuils proposés à titre de travail, non normés — voir <a href="/methodologie">Méthodologie</a>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

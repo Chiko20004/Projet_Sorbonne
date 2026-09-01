@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}{{ quartier.properties.nom }} — Fiche quartier — GOSP Sète{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% block content %}
+<div class="page-section page-section--narrow">
+  <p><a href="/quartiers">← Toutes les fiches quartier</a></p>
+  <h1>{{ quartier.properties.nom }}</h1>
+  <p class="hero__lede">
+    {{ "%.0f"|format(quartier.properties.population) if quartier.properties.population else "—" }} hab.
+    · {{ quartier.properties.nb_batiments }} bâtiments
+    · {{ quartier.properties.surf_km2 if quartier.properties.surf_km2 is not none else "—" }} km²
+  </p>
+
+  <div id="quartier-map" style="height: 260px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--color-border); margin-bottom: 1.5rem;"
+       role="img" aria-label="Localisation du quartier {{ quartier.properties.nom }} sur la carte de Sète"></div>
+
+  <div class="panel">
+    {% include "fragments/score_panel.html" %}
+  </div>
+
+  <p style="margin-top: 1.5rem;"><a class="btn" href="/exploration?territoire={{ quartier.properties.id }}">Explorer ce quartier en détail →</a></p>
+</div>
+<script defer>
+window.addEventListener("load", function () {
+  if (typeof L === "undefined") return;
+  var geom = {{ quartier.geometry | tojson }};
+  var map = L.map("quartier-map", { zoomControl: false, attributionControl: false });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+  var layer = L.geoJSON(geom, { style: { color: "#6f8bff", weight: 2, fillColor: "#6f8bff", fillOpacity: 0.25 } }).addTo(map);
+  map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+});
+</script>
+{% endblock %}

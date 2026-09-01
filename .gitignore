@@ -1,0 +1,27 @@
+# Environnements
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Données (volumineuses — voir scripts/fetch_data.sh)
+data/raw/
+data/processed/
+*.gpkg
+
+# Éditeurs
+.idea/
+.vscode/
+*.code-workspace
+
+# Système
+.DS_Store
+Thumbs.db
+*.log

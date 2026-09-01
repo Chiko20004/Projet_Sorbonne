@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% from "macros/page_hero.html" import grain_banner %}
+{% block title %}Documentation — GOSP Sète{% endblock %}
+{% block content %}
+{{ grain_banner("Documentation / Aide", "Prise en main de l'outil : filtres, rosace, radar, export.") }}
+<div class="page-section page-section--narrow">
+  <h2>Prise en main</h2>
+  <p>La page <a href="/exploration">Exploration</a> comporte trois zones : un formulaire de
+    filtres en haut, le panneau de score (rosace + radar) à gauche, et la carte à droite.
+    Changer un filtre met à jour les trois zones simultanément.</p>
+
+  <h2>Les filtres</h2>
+  <ul>
+    <li><strong>Territoire</strong> : "Toute la ville" ou un conseil de quartier précis. Change
+      les chiffres du panneau de score (radar, score pondéré) et centre la carte.</li>
+    <li><strong>Mode de transport</strong> : marche, vélo ou voiture.</li>
+    <li><strong>Durée</strong> : 15 ou 30 minutes.</li>
+    <li><strong>Unité spatiale</strong> : la granularité de la choroplèthe affichée sur la
+      carte (grille 200 m recommandée, grille 50 m détaillée, ou quartier).</li>
+    <li><strong>Niveau de proximité</strong> : filtre les équipements affichés sur la carte
+      (local, intermédiaire, centralité).</li>
+  </ul>
+
+  <h2>La rosace</h2>
+  <p>Cliquer un secteur de la rosace filtre les équipements affichés sur la carte sur cette
+    fonction, et le met en évidence. Cliquer de nouveau le même secteur, ou le centre,
+    réinitialise le filtre. La couleur de chaque secteur reflète son score (voir légende de la
+    carte). La rosace est utilisable au clavier (tabulation puis Entrée/Espace).</p>
+
+  <h2>Le radar</h2>
+  <p>Le radar affiche les 6 scores de fonction du territoire sélectionné, sur une échelle
+    unique de 0 à 10 (cohérente avec le score affiché au-dessus). En marche 15 min, ce sont des
+    valeurs directes des données. Pour les autres modes/durées, voir la note d'approximation
+    affichée sous le radar et détaillée en <a href="/methodologie#radar-approximation">Méthodologie</a>.</p>
+
+  <h2>Tableaux détaillés</h2>
+  <p>Les données chiffrées détaillées (score par fonction) sont masquées par défaut sous
+    "Détails par fonction" — cliquez pour les afficher.</p>
+
+  <h2>Export</h2>
+  <p>Chaque fiche quartier (<a href="/quartiers">liste</a>) est une page dédiée, imprimable
+    directement depuis le navigateur (Ctrl/Cmd+P) pour un export PDF simple.</p>
+</div>
+{% endblock %}
