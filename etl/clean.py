@@ -23,12 +23,22 @@ MODE_DUREE_COMBOS = [
 ]
 
 
+def _colonne_texte(serie: pd.Series) -> bool:
+    """Vrai pour une colonne susceptible de contenir des chaînes.
+
+    Le test ne peut pas se limiter à `dtype == object` : sous pandas 3 les
+    colonnes texte ont le dtype `str`, et un tel test laisse passer tout le
+    padding des exports sources.
+    """
+    return serie.dtype == object or pd.api.types.is_string_dtype(serie)
+
+
 def strip_strings(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Certains exports (ex. conseils_quartier_hqvs.geojson) stockent les
     chaînes avec un padding fixe ('La Lagune' + espaces jusqu'à largeur fixe).
     On les nettoie systématiquement plutôt qu'au cas par cas."""
     for col in gdf.columns:
-        if col != "geometry" and gdf[col].dtype == object:
+        if col != "geometry" and _colonne_texte(gdf[col]):
             gdf[col] = gdf[col].map(lambda v: v.strip() if isinstance(v, str) else v)
     return gdf
 
@@ -167,10 +177,9 @@ def load_quartiers(raw_dir: Path) -> gpd.GeoDataFrame:
     gdf = gpd.read_file(raw_dir / "conseils_quartier_hqvs.geojson")
     gdf = gdf.rename(columns={"poly_id": "id", "nom_quartier": "nom"})
     gdf = _rename_scores(gdf, ["score_hqvs_moyen"])
-    # population_ref (population de référence externe, ex. INSEE) est vide
-    # pour les 7 quartiers fournis : on utilise donc pop_batiments (population
-    # réellement calculée à partir des bâtiments), déjà cohérente avec les
-    # chiffres affichés par le prototype précédent (ex. La Lagune : 6 633 hab.).
+    # population_ref (population de référence externe, ex. INSEE) est vide sur les
+    # sept quartiers fournis. On retombe donc sur pop_batiments, calculée à partir
+    # des bâtiments, qui reste une population réellement mesurée.
     gdf["population_ref"] = pd.to_numeric(gdf["population_ref"], errors="coerce")
     gdf["population"] = gdf["population_ref"].fillna(gdf["pop_batiments"])
     gdf["surf_km2"] = pd.to_numeric(gdf["surf_km2"], errors="coerce").round(2)
