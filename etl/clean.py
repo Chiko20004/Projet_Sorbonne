@@ -18,6 +18,8 @@ import pandas as pd
 from config import FONCTIONS, OSM_TYPEQU_CORRESPONDANCE
 
 SCORE_FONCTION_COLS = [f"score_{f}" for f in FONCTIONS]
+# Colonnes dont la table de classification est la source, pas le fichier d'équipements.
+COLONNES_CLASSEES = ["proximite", "intermediaire", "centralite", "prioritaire", "niveau"] + FONCTIONS
 MODE_DUREE_COMBOS = [
     ("walking", 15), ("walking", 30),
     ("cycling", 15), ("cycling", 30),
@@ -135,13 +137,64 @@ def load_classification(raw_dir: Path) -> pd.DataFrame:
         df[col] = df[col].map({"True": True, "False": False, "": False}).fillna(False)
 
     df["niveau"] = df.apply(_derive_niveau, axis=1)
-    df = df.set_index("typequ")
-    return df
+
+    # A304 « école de conduite » est saisi deux fois, à la casse du libellé près.
+    # Les drapeaux étant identiques, la ligne en trop ne change que le libellé
+    # affiché et on garde la première. Un doublon qui classerait le même code de
+    # deux façons différentes, lui, demanderait un arbitrage : mieux vaut alors
+    # s'arrêter que d'en retenir un au hasard.
+    doublons = df[df["typequ"].duplicated(keep=False)]
+    if not doublons.empty:
+        distincts = doublons.drop(columns=["libelle_typequ"]).drop_duplicates()
+        if len(distincts) != doublons["typequ"].nunique():
+            raise ValueError(
+                "Codes typequ classés de deux façons différentes : "
+                + ", ".join(sorted(doublons["typequ"].unique()))
+            )
+        df = df.drop_duplicates(subset="typequ", keep="first")
+
+    return df.set_index("typequ")
+
+
+def _compter_divergences(gdf: gpd.GeoDataFrame, classification: pd.DataFrame) -> dict:
+    """Compare les booléens portés par le fichier d'équipements à ceux de la
+    classification, sur les seules lignes dont le code est connu. C'est ce
+    comptage qui justifie de ne garder qu'une source."""
+    connus = gdf[gdf["typequ"].isin(classification.index)]
+    if connus.empty:
+        return {}
+    table = connus.join(classification[COLONNES_CLASSEES], on="typequ", rsuffix="_cls")
+    comptes = {"equipements_a_code_connu": len(connus)}
+    for col in ["proximite", "intermediaire", "centralite"]:
+        if col in connus.columns:
+            fichier = table[col].fillna(0).astype(bool)
+            reference = table[f"{col}_cls"].astype(bool)
+            comptes[f"divergences_{col}"] = int((fichier != reference).sum())
+    if "niveau" in connus.columns:
+        ecart = table["niveau"].notna() & (table["niveau"] != table["niveau_cls"])
+        comptes["divergences_niveau"] = int(ecart.sum())
+    return comptes
+
+
+def _appliquer_classification(gdf: gpd.GeoDataFrame, classification: pd.DataFrame) -> gpd.GeoDataFrame:
+    """Fait de la table de classification la source unique du niveau de proximité
+    et des six fonctions.
+
+    Le fichier d'équipements porte ses propres booléens, qui contredisent la
+    table sur 1 400 lignes pour `proximite` (11,1 % des codes connus), 1 390 pour
+    `intermediaire` et 266 pour `centralite`. Sa colonne `niveau`, elle, est
+    d'accord avec la table sur la totalité des lignes. C'est donc la table qui
+    fait foi, et s'en tenir à elle évite d'arbitrer ligne à ligne entre deux
+    versions de la même information.
+    """
+    gdf = gdf.drop(columns=[c for c in COLONNES_CLASSEES if c in gdf.columns])
+    return gdf.join(classification[COLONNES_CLASSEES], on="typequ")
 
 
 def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoDataFrame:
     """Combine bpe24_equipements.geojson (source principale) et osm_equipements.geojson
-    (complémentaire, sans flags propres -> jointure sur typequ via la classification).
+    (complémentaire). Les deux tirent leur niveau et leurs fonctions de la même
+    table de classification, jointe sur typequ.
     """
     text_cols = ["nom", "commune", "libelle_typequ"]
 
@@ -152,6 +205,8 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     bpe["source"] = "bpe"
     bpe["id_source"] = bpe["id"]
     bpe["uid"] = construire_uid(bpe, "bpe")
+    comptes = _compter_divergences(bpe, classification)
+    bpe = _appliquer_classification(bpe, classification)
 
     osm = gpd.read_file(raw_dir / "osm_equipements.geojson").reset_index(drop=True)
     osm["libelle_typequ"] = osm["libelle_typequ"].map(fix_mojibake)
@@ -159,20 +214,13 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     # classification ne parlent pas le même code (voir OSM_TYPEQU_CORRESPONDANCE).
     osm["typequ_source"] = osm["typequ"]
     osm["typequ"] = osm["typequ"].map(OSM_TYPEQU_CORRESPONDANCE).fillna(osm["typequ"])
-
-    joined = osm.join(classification, on="typequ", rsuffix="_cls")
-    for col in ["proximite", "intermediaire", "centralite"] + FONCTIONS + ["prioritaire", "niveau"]:
-        osm[col] = joined[col]
-    # Le libellé de la classification fait autorité : le fichier orthographie le
-    # même parc de trois façons (« Par et jardin », « Parc et jardin », « parcs
-    # et jardins »).
-    osm["libelle_typequ"] = joined["libelle_typequ_cls"].fillna(osm["libelle_typequ"])
     osm["nom"] = None
     osm["commune"] = None
     osm["code_postal"] = None
     osm["source"] = "osm"
     osm["id_source"] = osm["id"]
     osm["uid"] = construire_uid(osm, "osm")
+    osm = _appliquer_classification(osm, classification)
 
     keep_cols = [
         "uid", "id_source", "typequ", "typequ_source", "libelle_typequ", "nom", "commune", "code_postal",
@@ -185,10 +233,15 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
 
     combined = pd.concat([bpe, osm], ignore_index=True)
     combined = gpd.GeoDataFrame(combined, geometry="geometry", crs="EPSG:4326")
-    # osm_equipements n'a pas de libellé sans jointure classification : on retombe
-    # sur les entrées inconnues de la classification (typequ absent des 240 codes).
-    combined["libelle_typequ"] = combined["libelle_typequ"].fillna(combined["typequ"])
-    return strip_strings(combined)
+    # Le libellé de la classification fait autorité : le fichier OSM orthographie
+    # le même parc de trois façons (« Par et jardin », « Parc et jardin »,
+    # « parcs et jardins »). À défaut, on garde celui du fichier, puis le code.
+    depuis_table = combined["typequ"].map(classification["libelle_typequ"])
+    combined["libelle_typequ"] = depuis_table.fillna(combined["libelle_typequ"]).fillna(combined["typequ"])
+
+    combined = strip_strings(combined)
+    combined.attrs["comptes"] = comptes
+    return combined
 
 
 def _rename_scores(gdf: gpd.GeoDataFrame, global_col_candidates: list[str]) -> gpd.GeoDataFrame:

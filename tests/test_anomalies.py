@@ -8,10 +8,18 @@ from __future__ import annotations
 
 import geopandas as gpd
 import pandas as pd
+import pytest
 from shapely.geometry import Point
 
-from config import OSM_TYPEQU_CORRESPONDANCE
-from etl.clean import construire_uid, normaliser_typequ, strip_strings
+from config import FONCTIONS, OSM_TYPEQU_CORRESPONDANCE
+from etl.clean import (
+    COLONNES_CLASSEES,
+    _appliquer_classification,
+    construire_uid,
+    load_classification,
+    normaliser_typequ,
+    strip_strings,
+)
 
 
 def _equipements(lignes: list[dict]) -> gpd.GeoDataFrame:
@@ -85,3 +93,47 @@ def test_correspondance_osm_couvre_les_codes_du_fichier():
     nul et les 662 équipements OSM perdent fonction et niveau."""
     assert set(OSM_TYPEQU_CORRESPONDANCE) == {"OSM1", "OSM2", "OSM3"}
     assert set(OSM_TYPEQU_CORRESPONDANCE.values()) == {"OSM_BUS", "OSM_COWORK", "OSM_PARC"}
+
+
+def _classification(lignes: list[dict]) -> pd.DataFrame:
+    """Table de classification minimale, indexée sur typequ comme la vraie."""
+    colonnes = {c: False for c in COLONNES_CLASSEES if c != "niveau"}
+    df = pd.DataFrame([{**colonnes, "libelle_typequ": "", **ligne} for ligne in lignes])
+    return df.set_index("typequ")
+
+
+def test_la_classification_prime_sur_les_booleens_du_fichier():
+    """Anomalie 4 : le fichier d'équipements se contredit lui-même. Ses booléens
+    divergent de la classification sur 1 400 lignes pour proximite, alors que sa
+    colonne niveau est d'accord avec elle sur la totalité des lignes."""
+    equipements = _equipements([
+        {"typequ": "A504", "proximite": 1.0, "intermediaire": 0.0, "habiter": 1.0, "niveau": "intermediaire"},
+    ])
+    classification = _classification([
+        {"typequ": "A504", "proximite": False, "intermediaire": True, "niveau": "intermediaire"},
+    ])
+    resultat = _appliquer_classification(equipements, classification)
+    assert bool(resultat["proximite"].iloc[0]) is False
+    assert bool(resultat["intermediaire"].iloc[0]) is True
+    assert resultat["niveau"].iloc[0] == "intermediaire"
+    assert bool(resultat["habiter"].iloc[0]) is False
+
+
+def test_un_code_classe_de_deux_facons_arrete_l_etl(tmp_path):
+    """A304 est saisi deux fois dans la table fournie, mais avec les mêmes
+    drapeaux : seul le libellé diffère, on garde la première ligne. Un vrai
+    désaccord, lui, ne doit pas passer en silence."""
+    entete = "typequ;libelle_typequ;proximite;intermediaire;centralite;" + ";".join(FONCTIONS) + ";prioritaire"
+    faux = ["False"] * (len(FONCTIONS) + 3)
+    csv_path = tmp_path / "bpe24key_classification.csv"
+
+    lignes = [f"A304;ÉCOLE DE CONDUITE;{';'.join(faux)};True", f"A304;école de conduite;{';'.join(faux)};True"]
+    csv_path.write_text("\n".join([entete, *lignes]), encoding="utf-8")
+    table = load_classification(tmp_path)
+    assert list(table.index) == ["A304"]
+    assert table.loc["A304", "libelle_typequ"] == "ÉCOLE DE CONDUITE"
+
+    divergent = [f"A304;école de conduite;True;{';'.join(faux[1:])};True", f"A304;école de conduite;{';'.join(faux)};True"]
+    csv_path.write_text("\n".join([entete, *divergent]), encoding="utf-8")
+    with pytest.raises(ValueError, match="A304"):
+        load_classification(tmp_path)

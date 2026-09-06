@@ -38,6 +38,13 @@ def main() -> None:
     equipements.to_file(PROCESSED_DATA_DIR / "equipements.geojson", driver="GeoJSON")
     log(f"  -> {len(equipements)} équipements")
 
+    comptes.update(equipements.attrs.get("comptes", {}))
+    log(f"  -> niveau : {comptes.get('divergences_niveau')} écart(s) entre le fichier "
+        f"et la classification, sur {comptes.get('equipements_a_code_connu')} codes connus")
+    log(f"  -> booléens du fichier écartés : {comptes.get('divergences_proximite')} sur proximite, "
+        f"{comptes.get('divergences_intermediaire')} sur intermediaire, "
+        f"{comptes.get('divergences_centralite')} sur centralite")
+
     osm = equipements[equipements["source"] == "osm"]
     comptes["equipements_osm"] = len(osm)
     comptes["equipements_osm_rattaches"] = int(
