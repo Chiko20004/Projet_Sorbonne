@@ -15,7 +15,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from config import FONCTIONS
+from config import FONCTIONS, OSM_TYPEQU_CORRESPONDANCE
 
 SCORE_FONCTION_COLS = [f"score_{f}" for f in FONCTIONS]
 MODE_DUREE_COMBOS = [
@@ -155,9 +155,18 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
 
     osm = gpd.read_file(raw_dir / "osm_equipements.geojson").reset_index(drop=True)
     osm["libelle_typequ"] = osm["libelle_typequ"].map(fix_mojibake)
+    # Sans cette traduction, la jointure ne rattache rien : le fichier et la
+    # classification ne parlent pas le même code (voir OSM_TYPEQU_CORRESPONDANCE).
+    osm["typequ_source"] = osm["typequ"]
+    osm["typequ"] = osm["typequ"].map(OSM_TYPEQU_CORRESPONDANCE).fillna(osm["typequ"])
+
     joined = osm.join(classification, on="typequ", rsuffix="_cls")
     for col in ["proximite", "intermediaire", "centralite"] + FONCTIONS + ["prioritaire", "niveau"]:
         osm[col] = joined[col]
+    # Le libellé de la classification fait autorité : le fichier orthographie le
+    # même parc de trois façons (« Par et jardin », « Parc et jardin », « parcs
+    # et jardins »).
+    osm["libelle_typequ"] = joined["libelle_typequ_cls"].fillna(osm["libelle_typequ"])
     osm["nom"] = None
     osm["commune"] = None
     osm["code_postal"] = None
@@ -166,7 +175,7 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     osm["uid"] = construire_uid(osm, "osm")
 
     keep_cols = [
-        "uid", "id_source", "typequ", "libelle_typequ", "nom", "commune", "code_postal",
+        "uid", "id_source", "typequ", "typequ_source", "libelle_typequ", "nom", "commune", "code_postal",
         "proximite", "intermediaire", "centralite", "niveau", "prioritaire",
         "source", "geometry",
     ] + FONCTIONS

@@ -10,6 +10,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
 
+from config import OSM_TYPEQU_CORRESPONDANCE
 from etl.clean import construire_uid, normaliser_typequ, strip_strings
 
 
@@ -76,3 +77,11 @@ def test_normaliser_typequ_rend_le_code_utilisable_en_url():
     assert normaliser_typequ("institut de beauté, onglerie") == "INSTITUT_DE_BEAUTE_ONGLERIE"
     assert normaliser_typequ(None) == "INCONNU"
     assert normaliser_typequ("   ") == "INCONNU"
+
+
+def test_correspondance_osm_couvre_les_codes_du_fichier():
+    """Anomalie 2 : le fichier OSM code OSM1/OSM2/OSM3, la classification nomme
+    OSM_BUS/OSM_COWORK/OSM_PARC. Sans table de traduction, le recouvrement est
+    nul et les 662 équipements OSM perdent fonction et niveau."""
+    assert set(OSM_TYPEQU_CORRESPONDANCE) == {"OSM1", "OSM2", "OSM3"}
+    assert set(OSM_TYPEQU_CORRESPONDANCE.values()) == {"OSM_BUS", "OSM_COWORK", "OSM_PARC"}
