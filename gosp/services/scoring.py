@@ -53,17 +53,29 @@ def _weighted_mean(cells: list[dict], key: str, weight_key: str = "population") 
 
 
 def score_panel(quartier_id: str | None, mode: str, duree: int) -> dict:
-    """Le score 'pondéré' est une moyenne
-    pondérée par la population des cellules, distincte du score 'brut'
-    (moyenne arithmétique simple), pour qu'une zone peu peuplée à score élevé
-    ne pèse pas autant qu'une zone dense au même score."""
+    """Score pondéré par la densité de population, à côté du score brut (moyenne
+    arithmétique simple), pour qu'une zone peu peuplée à score élevé ne pèse pas
+    autant qu'une zone dense au même score.
+
+    La pondération porte bien sur la densité, et non plus sur la population : le
+    panneau annonçait la première tout en calculant la seconde, et `surf_km2`
+    n'était renseignée nulle part. Sur la grille 200 m, les deux donnent le même
+    chiffre — les cellules mesurent toutes 0,0400 km² à deux dix-millièmes près,
+    et une moyenne pondérée ne dépend pas de l'échelle du poids. L'écart
+    n'apparaît qu'entre unités de tailles différentes : les sept quartiers vont
+    de 0,71 à 15,67 km². C'est pour eux, et pour les IRIS à venir, que le calcul
+    est fait explicitement.
+    """
     cells = _populated_cells(quartier_id)
     key = score_key(mode, duree)
     population_totale = sum(c["population"] for c in cells if c.get("population"))
+    surface_totale = sum(c.get("surf_km2") or 0.0 for c in cells)
     return {
         "brut": _arithmetic_mean(cells, key),
-        "pondere": _weighted_mean(cells, key),
+        "pondere": _weighted_mean(cells, key, weight_key="densite_hab_km2"),
         "population_totale": round(population_totale, 1),
+        "surface_km2": round(surface_totale, 2) if surface_totale else None,
+        "densite_hab_km2": round(population_totale / surface_totale, 1) if surface_totale else None,
         "n_cellules": len(cells),
     }
 

@@ -18,6 +18,9 @@ import pandas as pd
 from config import FONCTIONS, OSM_TYPEQU_CORRESPONDANCE
 
 SCORE_FONCTION_COLS = [f"score_{f}" for f in FONCTIONS]
+# Lambert 93 : projection légale en France métropolitaine, où une aire se mesure
+# en mètres. Calculer une surface directement en degrés n'aurait pas de sens.
+CRS_METRIQUE = 2154
 # Colonnes dont la table de classification est la source, pas le fichier d'équipements.
 COLONNES_CLASSEES = ["proximite", "intermediaire", "centralite", "prioritaire", "niveau"] + FONCTIONS
 MODE_DUREE_COMBOS = [
@@ -273,6 +276,25 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     return combined
 
 
+def ajouter_surface_et_densite(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Calcule la surface depuis la géométrie, puis en déduit la densité.
+
+    `surf_km2` est vide sur les sept quartiers fournis, alors que le panneau de
+    score annonce une pondération par la densité de population : l'indicateur
+    était annoncé sans jamais être calculé. On mesure donc l'aire en Lambert 93
+    (EPSG:2154), projection conforme où une surface se lit en mètres — la
+    calculer en degrés donnerait un nombre sans signification.
+
+    Si un millésime suivant renseigne `surf_km2`, la valeur calculée ici lui
+    servira de contrôle plutôt que de remplacement.
+    """
+    gdf = gdf.copy()
+    gdf["surf_km2"] = (gdf.geometry.to_crs(CRS_METRIQUE).area / 1e6).round(4)
+    population = pd.to_numeric(gdf["population"], errors="coerce")
+    gdf["densite_hab_km2"] = (population / gdf["surf_km2"]).round(1)
+    return gdf
+
+
 def _rename_scores(gdf: gpd.GeoDataFrame, global_col_candidates: list[str]) -> gpd.GeoDataFrame:
     for candidate in global_col_candidates:
         if candidate in gdf.columns:
@@ -307,7 +329,8 @@ def load_grille(raw_dir: Path, resolution: str) -> gpd.GeoDataFrame:
     non_peuplees["population"] = 0.0
 
     combined = pd.concat([peuplees, non_peuplees], ignore_index=True)
-    return strip_strings(gpd.GeoDataFrame(combined, geometry="geometry", crs="EPSG:4326"))
+    combined = gpd.GeoDataFrame(combined, geometry="geometry", crs="EPSG:4326")
+    return strip_strings(ajouter_surface_et_densite(combined))
 
 
 def load_quartiers(raw_dir: Path) -> gpd.GeoDataFrame:
@@ -319,5 +342,4 @@ def load_quartiers(raw_dir: Path) -> gpd.GeoDataFrame:
     # des bâtiments, qui reste une population réellement mesurée.
     gdf["population_ref"] = pd.to_numeric(gdf["population_ref"], errors="coerce")
     gdf["population"] = gdf["population_ref"].fillna(gdf["pop_batiments"])
-    gdf["surf_km2"] = pd.to_numeric(gdf["surf_km2"], errors="coerce").round(2)
-    return strip_strings(gdf)
+    return strip_strings(ajouter_surface_et_densite(gdf))

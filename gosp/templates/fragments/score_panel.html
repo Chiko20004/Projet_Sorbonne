@@ -10,7 +10,8 @@
   <div class="panel__stat">
     <span class="panel__stat-label">Score HQVS pondéré (densité de population)</span>
     <span class="panel__stat-value {{ panel.pondere | score_class }}">{{ panel.pondere if panel.pondere is not none else "—" }}<span style="font-size:1rem; color:var(--color-text-faint);"> / 10</span></span>
-    <span class="panel__stat-sub">Score brut (non pondéré) : {{ panel.brut if panel.brut is not none else "—" }} / 10 · {{ panel.n_cellules }} cellules · {{ "%.0f"|format(panel.population_totale) }} hab.</span>
+    <span class="panel__stat-sub">Score brut (non pondéré) : {{ panel.brut if panel.brut is not none else "—" }} / 10 · {{ panel.n_cellules }} cellules · {{ panel.population_totale | nombre }} hab.</span>
+    <span class="panel__stat-sub">{{ panel.surface_km2 | nombre(2) }} km² · {{ panel.densite_hab_km2 | nombre }} hab./km², densité qui sert de pondération</span>
   </div>
 
   {% if a_ameliorer %}

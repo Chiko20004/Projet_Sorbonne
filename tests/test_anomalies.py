@@ -9,7 +9,7 @@ from __future__ import annotations
 import geopandas as gpd
 import pandas as pd
 import pytest
-from shapely.geometry import Point
+from shapely.geometry import Point, Polygon
 
 from config import DUREE_REFERENCE, FONCTIONS, MODE_REFERENCE, OSM_TYPEQU_CORRESPONDANCE
 from etl.clean import (
@@ -20,6 +20,7 @@ from etl.clean import (
     rattraper_par_libelle,
     normaliser_typequ,
     strip_strings,
+    ajouter_surface_et_densite,
 )
 from gosp.services import scoring
 
@@ -195,3 +196,37 @@ def test_le_radar_ne_rabote_pas_la_combinaison_de_reference(monkeypatch):
     assert autre["ratio_approximation"] == 2.0
     assert autre["est_approximation"] is True
     assert all(v == 10.0 for v in autre["valeurs"].values())
+
+
+def test_la_surface_est_calculee_depuis_la_geometrie():
+    """Anomalie 7 : surf_km2 est vide sur les sept quartiers fournis, alors que
+    le panneau annonce une pondération par la densité. On la mesure en Lambert 93,
+    où une aire se lit en mètres."""
+    carre_1km = Polygon([(3.69, 43.40), (3.702, 43.40), (3.702, 43.409), (3.69, 43.409)])
+    gdf = gpd.GeoDataFrame(
+        {"population": [2000.0], "surf_km2": [None]}, geometry=[carre_1km], crs="EPSG:4326"
+    )
+    resultat = ajouter_surface_et_densite(gdf)
+    surface = resultat["surf_km2"].iloc[0]
+    assert 0.9 < surface < 1.1, surface
+    assert resultat["densite_hab_km2"].iloc[0] == round(2000.0 / surface, 1)
+
+
+def test_ponderation_par_densite_et_par_population_coincident_sur_une_grille(monkeypatch):
+    """Toutes les cellules de la grille 200 m ont la même surface : y pondérer par
+    la densité ou par la population donne le même chiffre. L'écart n'apparaît
+    qu'entre unités de tailles différentes, comme les quartiers."""
+    cellules = [
+        {"peuplee": True, "population": 1000.0, "surf_km2": 0.04, "densite_hab_km2": 25000.0,
+         "score_walking_15": 2.0},
+        {"peuplee": True, "population": 10.0, "surf_km2": 0.04, "densite_hab_km2": 250.0,
+         "score_walking_15": 8.0},
+    ]
+    monkeypatch.setattr(scoring.data_store, "get_grille",
+                        lambda _: {"features": [{"properties": c} for c in cellules]})
+    panneau = scoring.score_panel(None, "walking", 15)
+
+    assert panneau["pondere"] == scoring._weighted_mean(cellules, "score_walking_15", "population")
+    assert panneau["pondere"] < panneau["brut"]
+    assert panneau["surface_km2"] == 0.08
+    assert panneau["densite_hab_km2"] == 12625.0

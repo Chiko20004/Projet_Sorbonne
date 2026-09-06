@@ -30,8 +30,14 @@
     territoire : un score élevé sur une zone peu peuplée compte alors autant qu'un score élevé
     sur une zone dense. Ce site introduit un second indicateur, le <strong>score pondéré</strong>,
     calculé comme une moyenne des scores des cellules de la grille 200 m, pondérée par la
-    population de chaque cellule :</p>
-  <p class="mono note">score_pondéré = Σ(score_cellule × population_cellule) / Σ(population_cellule)</p>
+    densité de population de chaque cellule :</p>
+  <p class="mono note">score_pondéré = Σ(score_unité × densité_unité) / Σ(densité_unité)</p>
+  <p>La surface n'était renseignée dans aucun des fichiers fournis : elle est calculée ici
+    depuis les géométries, projetées en Lambert 93 (EPSG:2154). Sur la grille 200 m, pondérer
+    par la densité ou par la population donne le même chiffre, puisque toutes les cellules ont
+    la même surface. L'écart n'apparaît qu'entre unités de tailles différentes — les sept
+    conseils de quartier vont de 0,71 à 15,67 km². C'est pour eux, et pour un futur découpage
+    IRIS, que le calcul est fait explicitement.</p>
   <p>Le score brut (moyenne arithmétique simple) reste affiché à côté, pour comparaison. C'est
     une proposition méthodologique nouvelle de ce projet, pas le comportement historique du
     pipeline HQVS.</p>
