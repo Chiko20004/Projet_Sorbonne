@@ -129,11 +129,52 @@ def radar(quartier_id: str | None, mode: str, duree: int) -> dict:
     }
 
 
-def filter_equipements(fonction: str | None, niveau: str | None) -> dict:
-    layer = data_store.get_equipements()
-    features = layer["features"]
+def _equipements_du_territoire(quartier_id: str | None) -> list[dict]:
+    """Les équipements de Sète, ou d'un seul conseil de quartier.
+
+    Le fichier source couvre toute l'agglomération — Montpellier, Agde et
+    Frontignan y pèsent chacun plus lourd que Sète, qui n'en représente que 15 %.
+    Ces équipements lointains comptent dans le calcul amont des isochrones, parce
+    qu'un Sétois peut être proche d'un équipement situé au-delà de la limite
+    communale, mais ils n'ont rien à faire sur une carte de Sète ni dans un
+    compte annoncé comme sétois. Le rattachement posé par l'ETL les écarte.
+    """
+    features = data_store.get_equipements()["features"]
+    if quartier_id is not None:
+        return [f for f in features
+                if str(f["properties"].get("quartier_id")) == str(quartier_id)]
+    return [f for f in features if f["properties"].get("quartier_id") is not None]
+
+
+def filter_equipements(
+    fonction: str | None, niveau: str | None, quartier_id: str | None = None
+) -> dict:
+    features = _equipements_du_territoire(quartier_id)
     if fonction:
         features = [f for f in features if f["properties"].get(fonction)]
     if niveau:
         features = [f for f in features if f["properties"].get("niveau") == niveau]
     return {"type": "FeatureCollection", "features": features}
+
+
+def compter_equipements(
+    fonction: str | None, niveau: str | None, quartier_id: str | None = None
+) -> dict:
+    """Compte les équipements correspondant aux filtres, sans les sérialiser.
+
+    Renvoie aussi le nombre d'équipements du territoire dont la fonction est
+    inconnue. Ce second nombre n'est pas décoratif : ces équipements sortent du
+    compte dès qu'un filtre par fonction est actif, et n'afficher que le total
+    ferait mentir le compteur par omission.
+    """
+    territoire = _equipements_du_territoire(quartier_id)
+    filtres = filter_equipements(fonction, niveau, quartier_id)["features"]
+    sans_fonction = [
+        f for f in territoire
+        if not any(f["properties"].get(fn) for fn in FONCTIONS)
+    ]
+    return {
+        "total": len(filtres),
+        "sur_le_territoire": len(territoire),
+        "sans_fonction": len(sans_fonction),
+    }

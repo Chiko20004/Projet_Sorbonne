@@ -33,10 +33,30 @@ def main() -> None:
     log("chargement classification.csv")
     classification = clean.load_classification(RAW_DATA_DIR)
 
+    # Les quartiers passent avant les équipements : ceux-ci doivent porter leur
+    # quartier_id avant d'être écrits, pour être comptés quartier par quartier.
+    log("chargement quartiers")
+    quartiers = clean.load_quartiers(RAW_DATA_DIR)
+    quartiers.to_file(PROCESSED_DATA_DIR / "quartiers.geojson", driver="GeoJSON")
+    log(f"  -> {len(quartiers)} quartiers")
+
     log("chargement équipements (bpe + osm)")
     equipements = clean.load_equipements(RAW_DATA_DIR, classification)
+    comptes_equipements = equipements.attrs.get("comptes", {})
+    equipements = scores.rattacher_au_quartier(equipements, quartiers, cle="uid")
+    equipements.attrs["comptes"] = comptes_equipements
     equipements.to_file(PROCESSED_DATA_DIR / "equipements.geojson", driver="GeoJSON")
     log(f"  -> {len(equipements)} équipements")
+
+    # Le fichier couvre toute l'agglomération, pas Sète : Montpellier, Agde et
+    # Frontignan y pèsent plus lourd que Sète elle-même. Ces équipements comptent
+    # dans le calcul amont des isochrones — un Sétois peut être proche d'un
+    # équipement situé au-delà de la limite communale — mais ils n'ont rien à
+    # faire dans un compte annoncé comme sétois.
+    comptes["equipements_dans_sete"] = int(equipements["quartier_id"].notna().sum())
+    comptes["equipements_hors_sete"] = int(equipements["quartier_id"].isna().sum())
+    log(f"  -> {comptes['equipements_dans_sete']} dans les sept conseils de quartier, "
+        f"{comptes['equipements_hors_sete']} ailleurs dans l'agglomération")
 
     comptes.update(equipements.attrs.get("comptes", {}))
     log(f"  -> niveau : {comptes.get('divergences_niveau')} écart(s) entre le fichier "
@@ -61,17 +81,12 @@ def main() -> None:
     log(f"  -> dont {comptes['equipements_osm']} OSM, "
         f"{comptes['equipements_osm_rattaches']} rattachés à une fonction")
 
-    log("chargement quartiers")
-    quartiers = clean.load_quartiers(RAW_DATA_DIR)
-    quartiers.to_file(PROCESSED_DATA_DIR / "quartiers.geojson", driver="GeoJSON")
-    log(f"  -> {len(quartiers)} quartiers")
-
     for res in ("200m", "50m"):
         log(f"chargement grille {res}")
         grille = clean.load_grille(RAW_DATA_DIR, res)
         if res == "200m":
             log("  rattachement quartier_id (base du score pondéré par densité)")
-            grille = scores.assign_quartier_id(grille, quartiers)
+            grille = scores.rattacher_au_quartier(grille, quartiers)
         grille.to_file(PROCESSED_DATA_DIR / f"grille_{res}.geojson", driver="GeoJSON")
         log(f"  -> {len(grille)} cellules")
 

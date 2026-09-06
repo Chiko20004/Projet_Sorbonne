@@ -219,6 +219,18 @@ def _appliquer_classification(gdf: gpd.GeoDataFrame, classification: pd.DataFram
     # des sources fournies. On le marque au lieu de les laisser passer pour des
     # équipements sans fonction, ce qui n'est pas la même chose.
     gdf["classe"] = gdf["typequ_classe"].isin(classification.index)
+
+    # La jointure laisse ces colonnes en dtype object, mélange de booléens et de
+    # valeurs manquantes, que l'écriture GeoJSON convertit alors en chaînes. Or
+    # « False » est une chaîne non vide, donc vraie : le filtre par fonction de la
+    # rosace retenait tous les équipements classés, quel que soit le secteur
+    # cliqué. On force donc un vrai booléen.
+    #
+    # Les valeurs manquantes deviennent False, ce qui est exact : un équipement
+    # dont le code est inconnu n'a aucune fonction connue. La distinction entre
+    # « pas cette fonction » et « classement inconnu » reste portée par `classe`.
+    booleens = [c for c in COLONNES_CLASSEES if c != "niveau"]
+    gdf[booleens] = gdf[booleens].fillna(False).astype(bool)
     return gdf
 
 

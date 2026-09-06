@@ -14,6 +14,27 @@
     <span class="panel__stat-sub">{{ panel.surface_km2 | nombre(2) }} km² · {{ panel.densite_hab_km2 | nombre }} hab./km², densité qui sert de pondération</span>
   </div>
 
+  <div class="panel__stat">
+    <span class="panel__stat-label">
+      Équipements
+      {% if filters.fonction %}— {{ fonctions_labels[filters.fonction] }}{% endif %}
+      {% if filters.niveau %}— {{ niveaux[filters.niveau] }}{% endif %}
+    </span>
+    <span class="panel__stat-value" style="font-size: 1.5rem;">{{ equipements.total | nombre }}</span>
+    <span class="panel__stat-sub">
+      {% if filters.fonction or filters.niveau %}
+        sur {{ equipements.sur_le_territoire | nombre }}
+        {{ "dans ce quartier" if quartier else "à Sète" }}
+      {% else %}
+        {{ "dans ce quartier" if quartier else "à Sète" }}
+      {% endif %}
+      {% if equipements.sans_fonction %}
+        · {{ equipements.sans_fonction | nombre }} sans fonction renseignée, donc
+        absents dès qu'un secteur de la rosace est actif
+      {% endif %}
+    </span>
+  </div>
+
   {% if a_ameliorer %}
   <p class="note" style="border-color: var(--score-0);">
     <strong style="color: var(--score-0-text);">À améliorer :</strong> {{ fonctions_labels[a_ameliorer[0]] }} ({{ a_ameliorer[1] | nombre(2) }}/10)
@@ -27,8 +48,8 @@
       {{ rosace_svg(radar.valeurs, filters.fonction, 260) }}
     </div>
     <div class="svg-widget">
-      <h4>Radar des 6 fonctions <span class="help-icon" tabindex="0" aria-label="Aide">?<span class="visually-hidden">Score de 0 à 10 pour chacune des 6 fonctions sociales, sur le territoire sélectionné.</span></span></h4>
-      {{ radar_svg(radar.valeurs, fonctions_labels, 260) }}
+      <h4>Radar des 6 fonctions <span class="help-icon" tabindex="0" aria-label="Aide">?<span class="visually-hidden">Score de 0 à 10 pour chacune des 6 fonctions sociales, sur le territoire sélectionné. La fonction choisie dans la rosace y est mise en évidence : axe épaissi, point cerclé, libellé en gras.</span></span></h4>
+      {{ radar_svg(radar.valeurs, fonctions_labels, 260, filters.fonction) }}
     </div>
   </div>
 
@@ -41,6 +62,14 @@
 
   {% if not isochrone_disponible %}
   <p class="note">Le contour d'isochrone n'est disponible que pour <strong>marche · 15 min</strong> (seule géométrie fournie dans les données). La carte affiche ici la choroplèthe seule — voir <a href="/methodologie#isochrones">Méthodologie</a>.</p>
+  {% endif %}
+
+  {% if comptes.equipements_hors_sete %}
+  <p class="note">La carte n'affiche que les équipements de Sète. Les
+    {{ comptes.equipements_hors_sete | nombre }} autres du fichier source (Montpellier,
+    Agde, Frontignan…) entrent bien dans le calcul des temps d'accès — un équipement
+    juste au-delà de la limite communale reste accessible — mais ils ne sont ni
+    affichés ni comptés ici.</p>
   {% endif %}
 
   {% if combinee_15_30 is not none %}

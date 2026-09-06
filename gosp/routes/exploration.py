@@ -43,6 +43,9 @@ def _build_panel_context(filters: dict) -> dict:
     panel = scoring.score_panel(territoire, filters["mode"], filters["duree"])
     radar_data = scoring.radar(territoire, filters["mode"], filters["duree"])
     combinee = scoring.combined_duration_score(territoire, filters["mode"])
+    equipements = scoring.compter_equipements(
+        filters["fonction"], filters["niveau"], territoire
+    )
 
     values = radar_data["valeurs"]
     ranked = sorted(
@@ -55,12 +58,15 @@ def _build_panel_context(filters: dict) -> dict:
         "filters": filters,
         "quartier": quartier,
         "panel": panel,
+        "equipements": equipements,
+        "comptes": data_store.get_comptes(),
         "radar": radar_data,
         "combinee_15_30": combinee,
         "a_ameliorer": a_ameliorer,
         "mieux_desservi": mieux_desservi,
         "fonctions_labels": FONCTIONS_LABELS,
         "modes": MODE_LABELS,
+        "niveaux": NIVEAU_LABELS,
         "isochrone_disponible": (filters["mode"], filters["duree"]) == (MODE_REFERENCE, DUREE_REFERENCE),
     }
 
@@ -72,8 +78,7 @@ def exploration():
     return render_template(
         "exploration.html",
         quartiers=data_store.get_quartiers()["features"],
-        durees=DUREES, unites=UNITE_LABELS,
-        niveaux=NIVEAU_LABELS, fonctions=FONCTIONS_LABELS,
+        durees=DUREES, unites=UNITE_LABELS, fonctions=FONCTIONS_LABELS,
         **ctx,
     )
 

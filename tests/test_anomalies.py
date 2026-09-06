@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pytest
 from shapely.geometry import Point, Polygon
@@ -173,7 +174,9 @@ def test_les_equipements_non_classes_sont_marques():
     resultat = _appliquer_classification(gdf, classification)
     assert resultat["classe"].tolist() == [True, False]
     assert bool(resultat["habiter"].iloc[0]) is True
-    assert pd.isna(resultat["habiter"].iloc[1])
+    # Un code inconnu n'a aucune fonction connue : les six sont à False, et c'est
+    # `classe` qui distingue « pas cette fonction » de « classement inconnu ».
+    assert bool(resultat["habiter"].iloc[1]) is False
 
 
 def test_le_radar_ne_rabote_pas_la_combinaison_de_reference(monkeypatch):
@@ -261,3 +264,27 @@ def test_nombre_ecrit_a_la_francaise(valeur, decimales, attendu):
     """Convention du projet : virgule décimale, espace comme séparateur de
     milliers, tiret quand la donnée manque."""
     assert presentation.nombre(valeur, decimales) == attendu
+
+
+def test_les_indicateurs_de_fonction_sont_de_vrais_booleens():
+    """La jointure laisse ces colonnes en dtype object, que l'écriture GeoJSON
+    convertit en chaînes. « False » étant une chaîne non vide, donc vraie, le
+    filtre par fonction de la rosace retenait tous les équipements classés quel
+    que soit le secteur cliqué."""
+    classification = _classification([
+        {"typequ": "B203", "habiter": True, "travailler": False, "proximite": True},
+    ])
+    gdf = _equipements([
+        {"typequ": "B203", "typequ_classe": "B203"},
+        {"typequ": "E101", "typequ_classe": "E101"},
+    ])
+    resultat = _appliquer_classification(gdf, classification)
+
+    for colonne in FONCTIONS + ["proximite", "intermediaire", "centralite", "prioritaire"]:
+        assert resultat[colonne].dtype == bool, colonne
+        assert all(isinstance(v, (bool, np.bool_)) for v in resultat[colonne]), colonne
+
+    # Un code inconnu n'a aucune fonction connue : False, et `classe` dit pourquoi.
+    assert resultat["habiter"].tolist() == [True, False]
+    assert resultat["travailler"].tolist() == [False, False]
+    assert resultat["classe"].tolist() == [True, False]
