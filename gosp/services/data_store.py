@@ -6,12 +6,17 @@ polygones) n'est PAS chargé en mémoire : on interroge un équipement à la foi
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import geopandas as gpd
 
 from config import PROCESSED_DATA_DIR
 from etl.clean import fix_mojibake
+
+# L'uid arrive par l'URL et part dans une clause WHERE : on n'accepte que la
+# forme produite par `clean.construire_uid`, rien d'autre.
+UID_VALIDE = re.compile(r"[a-z]+-[A-Z0-9_]+-\d+(-\d+)?")
 
 _layers: dict[str, dict] = {}
 _classification: list[dict] = []
@@ -64,9 +69,16 @@ def find_quartier(quartier_id: str) -> dict | None:
     return None
 
 
-def get_isochrone(equipement_id: int) -> dict | None:
+def get_isochrone(equipement_uid: str) -> dict | None:
+    """L'isochrone se cherche par identifiant stable, pas par l'id du fichier
+    source : celui-ci est porté par deux équipements distincts sur 792 lignes et
+    renvoyait donc parfois la géométrie d'un autre équipement."""
+    if not UID_VALIDE.fullmatch(equipement_uid or ""):
+        return None
     path = PROCESSED_DATA_DIR / "isochrones.gpkg"
-    gdf = gpd.read_file(path, layer="isochrones", where=f"equipement_id = {int(equipement_id)}")
+    gdf = gpd.read_file(
+        path, layer="isochrones", where=f"equipement_uid = '{equipement_uid}'"
+    )
     if gdf.empty:
         return None
     feature = json.loads(gdf.to_json())["features"][0]

@@ -8,6 +8,8 @@ tous les mêmes conventions, ex. `score_hqvs_moyen` vs `score_hqvs_global`).
 from __future__ import annotations
 
 import csv
+import re
+import unicodedata
 from pathlib import Path
 
 import geopandas as gpd
@@ -62,6 +64,48 @@ def fix_mojibake(value):
     return repaired
 
 
+def normaliser_typequ(valeur) -> str:
+    """Ramène un code typequ à [A-Z0-9_], pour qu'il tienne dans un identifiant
+    d'URL. Un seul code du jeu fourni en a besoin ('institut de beauté,
+    onglerie'), mais rien ne garantit qu'un millésime suivant soit plus propre.
+    """
+    if not isinstance(valeur, str) or not valeur.strip():
+        return "INCONNU"
+    sans_accent = "".join(
+        c for c in unicodedata.normalize("NFKD", valeur.strip().upper())
+        if not unicodedata.combining(c)
+    )
+    return re.sub(r"[^A-Z0-9]+", "_", sans_accent).strip("_") or "INCONNU"
+
+
+def construire_uid(gdf: gpd.GeoDataFrame, fichier: str) -> pd.Series:
+    """Identifiant stable d'équipement, de la forme `<fichier>-<typequ>-<id source>`.
+
+    L'id source seul ne suffit pas : quatre couches ajoutées après coup dans
+    bpe24_equipements.geojson (OSM_BUS, AJOUT_MANUEL, OSM_PARC, OSM_COWORK)
+    repartent chacune d'un compteur à 1 et percutent les codes BPE officiels.
+    396 identifiants sont ainsi portés par deux équipements distincts, ce qui
+    faisait servir la mauvaise isochrone. Préfixer par la couche source, et non
+    par le fichier d'origine, en résout 371.
+
+    Les 25 collisions restantes sont internes à une couche : deux équipements y
+    partagent le même code ET le même id. On les sépare par leur nom, qui diffère
+    toujours, en suffixant les suivants -2, -3… L'ordre est celui des noms, donc
+    l'identifiant reste le même d'une exécution de l'ETL à l'autre.
+    """
+    base = (
+        fichier + "-" + gdf["typequ"].map(normaliser_typequ) + "-" + gdf["id"].astype(str)
+    )
+    rang = (
+        pd.DataFrame({"base": base, "nom": gdf.get("nom", pd.Series(index=gdf.index)).fillna("").astype(str)})
+        .sort_values(["base", "nom"], kind="stable")
+        .groupby("base")
+        .cumcount()
+        .reindex(gdf.index)
+    )
+    return base.where(rang == 0, base + "-" + (rang + 1).astype(str))
+
+
 def _derive_niveau(row) -> str | None:
     if row.get("centralite"):
         return "centralite"
@@ -101,14 +145,15 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     """
     text_cols = ["nom", "commune", "libelle_typequ"]
 
-    bpe = gpd.read_file(raw_dir / "bpe24_equipements.geojson")
+    bpe = gpd.read_file(raw_dir / "bpe24_equipements.geojson").reset_index(drop=True)
     for col in text_cols:
         if col in bpe.columns:
             bpe[col] = bpe[col].map(fix_mojibake)
     bpe["source"] = "bpe"
-    bpe["id"] = "bpe-" + bpe["id"].astype(str)
+    bpe["id_source"] = bpe["id"]
+    bpe["uid"] = construire_uid(bpe, "bpe")
 
-    osm = gpd.read_file(raw_dir / "osm_equipements.geojson")
+    osm = gpd.read_file(raw_dir / "osm_equipements.geojson").reset_index(drop=True)
     osm["libelle_typequ"] = osm["libelle_typequ"].map(fix_mojibake)
     joined = osm.join(classification, on="typequ", rsuffix="_cls")
     for col in ["proximite", "intermediaire", "centralite"] + FONCTIONS + ["prioritaire", "niveau"]:
@@ -117,10 +162,11 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     osm["commune"] = None
     osm["code_postal"] = None
     osm["source"] = "osm"
-    osm["id"] = "osm-" + osm["id"].astype(str)
+    osm["id_source"] = osm["id"]
+    osm["uid"] = construire_uid(osm, "osm")
 
     keep_cols = [
-        "id", "typequ", "libelle_typequ", "nom", "commune", "code_postal",
+        "uid", "id_source", "typequ", "libelle_typequ", "nom", "commune", "code_postal",
         "proximite", "intermediaire", "centralite", "niveau", "prioritaire",
         "source", "geometry",
     ] + FONCTIONS

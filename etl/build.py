@@ -60,18 +60,24 @@ def main() -> None:
     )
 
     log("conversion isochrones (122 Mo) -> GeoPackage indexé + simplifié")
-    isochrones.build_isochrones_store(
+    comptes_isochrones = isochrones.build_isochrones_store(
         RAW_DATA_DIR / "isochrones_walking_15min.geojson",
         PROCESSED_DATA_DIR / "isochrones.gpkg",
         ISOCHRONE_SIMPLIFY_TOLERANCE,
+        equipements,
     )
     size_mb = (PROCESSED_DATA_DIR / "isochrones.gpkg").stat().st_size / 1e6
     log(f"  -> isochrones.gpkg ({size_mb:.1f} Mo)")
+    log(f"  -> {comptes_isochrones['equipements_avec_isochrone']} équipements rattachés, "
+        f"{comptes_isochrones['isochrones_sans_equipement']} isochrones orphelines")
+    log(f"  -> {comptes_isochrones['isochrones_fusionnees']} contours issus d'un "
+        "identifiant ambigu, signalés dans l'interface")
 
     meta = {
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "raw_data_dir": str(RAW_DATA_DIR),
         "duration_seconds": round(time.time() - t0, 1),
+        "comptes": comptes_isochrones,
     }
     (PROCESSED_DATA_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
     log(f"terminé en {meta['duration_seconds']}s")

@@ -68,13 +68,29 @@
       var html = "<strong>" + (p.nom || p.libelle_typequ) + "</strong><br>" + p.libelle_typequ;
       layer.bindPopup(html);
       layer.on("click", function () {
-        loadIsochroneIfAvailable(p.id, p.typequ);
+        loadIsochroneIfAvailable(p.uid);
       });
     },
   }).addTo(map);
 
   var isochroneLayer = L.geoJSON(null, {
-    style: { color: "#6f8bff", weight: 2, fillColor: "#6f8bff", fillOpacity: 0.12, dashArray: "4 3" },
+    style: function (feature) {
+      // Un contour issu d'un identifiant ambigu fusionne deux équipements sans
+      // rapport. On le trace en gris et sans remplissage, pour qu'il ne se lise
+      // pas comme une isochrone fiable.
+      if (feature.properties.geometrie_fusionnee) {
+        return { color: "#8c8494", weight: 2, fill: false, dashArray: "2 5" };
+      }
+      return { color: "#6f8bff", weight: 2, fillColor: "#6f8bff", fillOpacity: 0.12, dashArray: "4 3" };
+    },
+    onEachFeature: function (feature, layer) {
+      if (feature.properties.geometrie_fusionnee) {
+        layer.bindTooltip(
+          "Contour non fiable : les données sources ont fusionné cet équipement " +
+          "avec un autre portant le même identifiant."
+        );
+      }
+    },
   }).addTo(map);
 
   function currentFilters() {
@@ -114,12 +130,13 @@
       });
   }
 
-  function loadIsochroneIfAvailable(equipementId, typequ) {
+  function loadIsochroneIfAvailable(equipementUid) {
     var f = currentFilters();
     isochroneLayer.clearLayers();
     if (f.mode !== "walking" || f.duree !== "15") return; // seule combinaison avec géométrie réelle
-    var numericId = String(equipementId).replace(/^bpe-|^osm-/, "");
-    fetch("/api/isochrone/" + numericId)
+    // L'uid part tel quel : c'est lui qui identifie l'équipement dans le
+    // GeoPackage. Retirer son préfixe ramènerait l'ambiguïté qu'il corrige.
+    fetch("/api/isochrone/" + encodeURIComponent(equipementUid))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (feature) {
         if (feature) isochroneLayer.addData(feature);

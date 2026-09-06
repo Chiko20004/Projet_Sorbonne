@@ -48,15 +48,35 @@ def test_api_equipements_filter_by_fonction(client):
     all_eq = client.get("/api/equipements").get_json()["features"]
     habiter_only = client.get("/api/equipements?fonction=habiter").get_json()["features"]
     assert len(habiter_only) < len(all_eq)
-    assert all(f["properties"]["id"] for f in habiter_only)
+    assert all(f["properties"]["uid"] for f in habiter_only)
 
 
 def test_api_isochrone_available_for_known_equipement(client):
-    resp = client.get("/api/isochrone/1")
+    resp = client.get("/api/isochrone/bpe-A133-1")
     assert resp.status_code == 200
     assert resp.get_json()["geometry"]["type"] in ("Polygon", "MultiPolygon")
 
 
+def test_api_isochrone_distingue_les_identifiants_en_collision(client):
+    """L'id source 1 est porté par deux équipements sans rapport : la déchèterie
+    de Sète (A133) et un arrêt de bus (OSM_BUS). L'ancienne route, qui cherchait
+    par cet entier, en servait un des deux au hasard."""
+    decheterie = client.get("/api/isochrone/bpe-A133-1").get_json()
+    arret = client.get("/api/isochrone/bpe-OSM_BUS-1").get_json()
+    assert decheterie["properties"]["equipement_uid"] == "bpe-A133-1"
+    assert arret["properties"]["equipement_uid"] == "bpe-OSM_BUS-1"
+    # Le calcul amont ayant lui aussi regroupé sur l'identifiant ambigu, ces deux
+    # contours sont le même polygone fusionné. La route sert désormais la bonne
+    # ligne, et cette ligne dit qu'elle n'est pas fiable.
+    assert decheterie["properties"]["geometrie_fusionnee"] is True
+    assert arret["properties"]["geometrie_fusionnee"] is True
+
+
+def test_api_isochrone_ne_signale_pas_les_contours_sains(client):
+    resp = client.get("/api/isochrone/bpe-A301-4").get_json()
+    assert resp["properties"]["geometrie_fusionnee"] is False
+
+
 def test_api_isochrone_404_for_unknown_id(client):
-    resp = client.get("/api/isochrone/999999999")
-    assert resp.status_code == 404
+    assert client.get("/api/isochrone/999999999").status_code == 404
+    assert client.get("/api/isochrone/bpe-A133-999999").status_code == 404
