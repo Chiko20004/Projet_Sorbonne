@@ -36,3 +36,11 @@ def score_label(value) -> str:
         if value < ceiling:
             return label
     return "très bon"
+
+
+def nombre(valeur) -> str:
+    """Écriture française d'un entier : espace insécable fine tous les trois
+    chiffres, comme « 4 099 »."""
+    if valeur is None:
+        return "—"
+    return f"{int(valeur):,}".replace(",", "\u202f")

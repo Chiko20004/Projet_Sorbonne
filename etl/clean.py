@@ -176,6 +176,28 @@ def _compter_divergences(gdf: gpd.GeoDataFrame, classification: pd.DataFrame) ->
     return comptes
 
 
+def rattraper_par_libelle(gdf: gpd.GeoDataFrame, classification: pd.DataFrame) -> pd.Series:
+    """Code de classement des équipements dont le `typequ` est inconnu de la table
+    mais dont le libellé y figure mot pour mot.
+
+    89 équipements portent le code `AJOUT_MANUEL`, qui n'est pas un code BPE.
+    Leur libellé, lui, en est un : « boulangerie, pâtisserie », « pharmacie »,
+    « coiffure »… Les rattacher par ce libellé n'invente rien, c'est la même
+    chaîne de caractères des deux côtés. Deux libellés restent dehors, « centre
+    social » et « papeterie et press », qui n'ont pas d'équivalent exact : on ne
+    les corrige pas à la main.
+    """
+    par_libelle = (
+        classification.reset_index()
+        .assign(_l=lambda d: d["libelle_typequ"].str.strip().str.casefold())
+        .drop_duplicates(subset="_l", keep="first")
+        .set_index("_l")["typequ"]
+    )
+    inconnus = ~gdf["typequ"].isin(classification.index)
+    libelles = gdf["libelle_typequ"].where(inconnus).str.strip().str.casefold()
+    return libelles.map(par_libelle).fillna(gdf["typequ"])
+
+
 def _appliquer_classification(gdf: gpd.GeoDataFrame, classification: pd.DataFrame) -> gpd.GeoDataFrame:
     """Fait de la table de classification la source unique du niveau de proximité
     et des six fonctions.
@@ -188,7 +210,13 @@ def _appliquer_classification(gdf: gpd.GeoDataFrame, classification: pd.DataFram
     versions de la même information.
     """
     gdf = gdf.drop(columns=[c for c in COLONNES_CLASSEES if c in gdf.columns])
-    return gdf.join(classification[COLONNES_CLASSEES], on="typequ")
+    gdf = gdf.join(classification[COLONNES_CLASSEES], on="typequ_classe")
+    # 4 099 équipements gardent un code que la table ne connaît pas et n'ont donc
+    # ni niveau ni fonction. Les classer demanderait la nomenclature BPE, absente
+    # des sources fournies. On le marque au lieu de les laisser passer pour des
+    # équipements sans fonction, ce qui n'est pas la même chose.
+    gdf["classe"] = gdf["typequ_classe"].isin(classification.index)
+    return gdf
 
 
 def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoDataFrame:
@@ -206,14 +234,15 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     bpe["id_source"] = bpe["id"]
     bpe["uid"] = construire_uid(bpe, "bpe")
     comptes = _compter_divergences(bpe, classification)
+    bpe["typequ_classe"] = rattraper_par_libelle(bpe, classification)
     bpe = _appliquer_classification(bpe, classification)
 
     osm = gpd.read_file(raw_dir / "osm_equipements.geojson").reset_index(drop=True)
     osm["libelle_typequ"] = osm["libelle_typequ"].map(fix_mojibake)
-    # Sans cette traduction, la jointure ne rattache rien : le fichier et la
-    # classification ne parlent pas le même code (voir OSM_TYPEQU_CORRESPONDANCE).
-    osm["typequ_source"] = osm["typequ"]
-    osm["typequ"] = osm["typequ"].map(OSM_TYPEQU_CORRESPONDANCE).fillna(osm["typequ"])
+    # `typequ` garde ce que dit le fichier ; `typequ_classe` porte le code sous
+    # lequel la table de classification connaît l'équipement. Sans cette
+    # traduction, la jointure OSM ne rattache rien (voir OSM_TYPEQU_CORRESPONDANCE).
+    osm["typequ_classe"] = osm["typequ"].map(OSM_TYPEQU_CORRESPONDANCE).fillna(osm["typequ"])
     osm["nom"] = None
     osm["commune"] = None
     osm["code_postal"] = None
@@ -223,8 +252,8 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     osm = _appliquer_classification(osm, classification)
 
     keep_cols = [
-        "uid", "id_source", "typequ", "typequ_source", "libelle_typequ", "nom", "commune", "code_postal",
-        "proximite", "intermediaire", "centralite", "niveau", "prioritaire",
+        "uid", "id_source", "typequ", "typequ_classe", "libelle_typequ", "nom", "commune", "code_postal",
+        "proximite", "intermediaire", "centralite", "niveau", "prioritaire", "classe",
         "source", "geometry",
     ] + FONCTIONS
 
@@ -236,7 +265,7 @@ def load_equipements(raw_dir: Path, classification: pd.DataFrame) -> gpd.GeoData
     # Le libellé de la classification fait autorité : le fichier OSM orthographie
     # le même parc de trois façons (« Par et jardin », « Parc et jardin »,
     # « parcs et jardins »). À défaut, on garde celui du fichier, puis le code.
-    depuis_table = combined["typequ"].map(classification["libelle_typequ"])
+    depuis_table = combined["typequ_classe"].map(classification["libelle_typequ"])
     combined["libelle_typequ"] = depuis_table.fillna(combined["libelle_typequ"]).fillna(combined["typequ"])
 
     combined = strip_strings(combined)

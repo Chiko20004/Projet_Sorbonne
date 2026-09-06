@@ -17,6 +17,7 @@ from etl.clean import (
     _appliquer_classification,
     construire_uid,
     load_classification,
+    rattraper_par_libelle,
     normaliser_typequ,
     strip_strings,
 )
@@ -97,7 +98,8 @@ def test_correspondance_osm_couvre_les_codes_du_fichier():
 
 def _classification(lignes: list[dict]) -> pd.DataFrame:
     """Table de classification minimale, indexée sur typequ comme la vraie."""
-    colonnes = {c: False for c in COLONNES_CLASSEES if c != "niveau"}
+    colonnes = {c: False for c in COLONNES_CLASSEES}
+    colonnes["niveau"] = None
     df = pd.DataFrame([{**colonnes, "libelle_typequ": "", **ligne} for ligne in lignes])
     return df.set_index("typequ")
 
@@ -107,7 +109,8 @@ def test_la_classification_prime_sur_les_booleens_du_fichier():
     divergent de la classification sur 1 400 lignes pour proximite, alors que sa
     colonne niveau est d'accord avec elle sur la totalité des lignes."""
     equipements = _equipements([
-        {"typequ": "A504", "proximite": 1.0, "intermediaire": 0.0, "habiter": 1.0, "niveau": "intermediaire"},
+        {"typequ": "A504", "typequ_classe": "A504", "proximite": 1.0,
+         "intermediaire": 0.0, "habiter": 1.0, "niveau": "proximite"},
     ])
     classification = _classification([
         {"typequ": "A504", "proximite": False, "intermediaire": True, "niveau": "intermediaire"},
@@ -137,3 +140,32 @@ def test_un_code_classe_de_deux_facons_arrete_l_etl(tmp_path):
     csv_path.write_text("\n".join([entete, *divergent]), encoding="utf-8")
     with pytest.raises(ValueError, match="A304"):
         load_classification(tmp_path)
+
+
+def test_rattrapage_par_libelle_quand_le_code_est_inconnu():
+    """Anomalie 3 : 89 équipements portent le code AJOUT_MANUEL, absent de la
+    classification, mais un libellé qui y figure mot pour mot."""
+    classification = _classification([
+        {"typequ": "B203", "libelle_typequ": "boulangerie, pâtisserie", "proximite": True},
+    ])
+    gdf = _equipements([
+        {"typequ": "AJOUT_MANUEL", "libelle_typequ": "boulangerie, pâtisserie"},
+        {"typequ": "AJOUT_MANUEL", "libelle_typequ": "centre social"},
+        {"typequ": "B203", "libelle_typequ": "boulangerie, pâtisserie"},
+    ])
+    resolus = rattraper_par_libelle(gdf, classification)
+    assert resolus.tolist() == ["B203", "AJOUT_MANUEL", "B203"]
+
+
+def test_les_equipements_non_classes_sont_marques():
+    """On ne les fait pas passer pour des équipements sans fonction : on dit que
+    leur classement est inconnu, ce qui n'est pas la même chose."""
+    classification = _classification([{"typequ": "B203", "habiter": True}])
+    gdf = _equipements([
+        {"typequ": "B203", "typequ_classe": "B203"},
+        {"typequ": "E101", "typequ_classe": "E101"},
+    ])
+    resultat = _appliquer_classification(gdf, classification)
+    assert resultat["classe"].tolist() == [True, False]
+    assert bool(resultat["habiter"].iloc[0]) is True
+    assert pd.isna(resultat["habiter"].iloc[1])

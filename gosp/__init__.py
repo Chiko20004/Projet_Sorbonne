@@ -24,6 +24,7 @@ def create_app() -> Flask:
     app.jinja_env.filters["score_color"] = presentation.score_css_var
     app.jinja_env.filters["score_class"] = presentation.score_class
     app.jinja_env.filters["score_label"] = presentation.score_label
+    app.jinja_env.filters["nombre"] = presentation.nombre
 
     @app.context_processor
     def inject_nav():

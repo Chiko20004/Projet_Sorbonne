@@ -79,6 +79,45 @@
     offre un meilleur équilibre lisibilité/poids de rendu. Les conseils de quartier restent
     disponibles pour une vue agrégée, comme sur le site précédent.</p>
 
+  <h2>Limites des données sources</h2>
+  <p>Les chiffres ci-dessous sont recomptés à chaque construction des données, et non
+    recopiés à la main. Ils décrivent l'extrait qui nous a été fourni, pas la base de
+    production de la Chaire.</p>
+  <table class="data-table">
+    <thead><tr><th>Constat</th><th>Nombre</th><th>Ce que nous en faisons</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Équipements dont le code n'est connu ni de la classification, ni par son libellé</td>
+        <td class="mono">{{ comptes.equipements_non_classes | nombre }}</td>
+        <td>Affichés sur la carte, mais sans fonction ni niveau de proximité. Ils
+          disparaissent donc dès qu'un filtre par fonction est actif, et n'entrent pas
+          dans le calcul du score. Les classer demanderait la nomenclature BPE complète,
+          absente des fichiers fournis.</td>
+      </tr>
+      <tr>
+        <td>Équipements rattrapés par leur libellé, faute de code valide</td>
+        <td class="mono">{{ comptes.equipements_rattrapes_par_libelle | nombre }}</td>
+        <td>Leur code (<code>AJOUT_MANUEL</code>) n'existe pas dans la classification,
+          mais leur libellé y figure mot pour mot. Le rattachement n'invente rien.</td>
+      </tr>
+      <tr>
+        <td>Équipements dont les indicateurs du fichier contredisent la classification</td>
+        <td class="mono">{{ comptes.divergences_proximite | nombre }}</td>
+        <td>Sur le seul niveau de proximité, et sur {{ comptes.equipements_a_code_connu | nombre }}
+          équipements à code connu. La classification fait foi : la colonne
+          <code>niveau</code> du fichier est d'accord avec elle sur la totalité des
+          lignes, ses indicateurs ligne à ligne non.</td>
+      </tr>
+      <tr>
+        <td>Isochrones calculées à partir d'un identifiant ambigu</td>
+        <td class="mono">{{ comptes.isochrones_fusionnees | nombre }}</td>
+        <td>Le contour y fusionne deux équipements sans rapport, parfois distants de
+          plusieurs kilomètres. La carte les trace en gris pointillé et le signale.
+          Les réparer demanderait de relancer le calcul en amont.</td>
+      </tr>
+    </tbody>
+  </table>
+
   <h2>Ce qui n'est pas implémenté</h2>
   <ul>
     <li><strong>Pondération poids_hqvs / tier_rarete</strong> : ces colonnes existent bien

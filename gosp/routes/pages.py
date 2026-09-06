@@ -20,6 +20,7 @@ def methodologie():
         modes=MODE_LABELS,
         niveaux=NIVEAU_LABELS,
         unites=UNITE_LABELS,
+        comptes=data_store.get_comptes(),
     )
 
 

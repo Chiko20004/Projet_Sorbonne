@@ -45,6 +45,14 @@ def main() -> None:
         f"{comptes.get('divergences_intermediaire')} sur intermediaire, "
         f"{comptes.get('divergences_centralite')} sur centralite")
 
+    comptes["equipements_non_classes"] = int((~equipements["classe"]).sum())
+    comptes["equipements_rattrapes_par_libelle"] = int(
+        (equipements["classe"] & (equipements["typequ"] != equipements["typequ_classe"])
+         & (equipements["source"] == "bpe")).sum()
+    )
+    log(f"  -> {comptes['equipements_rattrapes_par_libelle']} rattrapés par leur libellé, "
+        f"{comptes['equipements_non_classes']} restent sans fonction connue")
+
     osm = equipements[equipements["source"] == "osm"]
     comptes["equipements_osm"] = len(osm)
     comptes["equipements_osm_rattaches"] = int(

@@ -20,6 +20,7 @@ UID_VALIDE = re.compile(r"[a-z]+-[A-Z0-9_]+-\d+(-\d+)?")
 
 _layers: dict[str, dict] = {}
 _classification: list[dict] = []
+_meta: dict = {}
 
 
 class DataNotBuiltError(RuntimeError):
@@ -36,9 +37,11 @@ def load_all() -> None:
         with open(PROCESSED_DATA_DIR / f"{name}.geojson", encoding="utf-8") as f:
             _layers[name] = json.load(f)
 
-    global _classification
+    global _classification, _meta
     with open(PROCESSED_DATA_DIR / "classification.json", encoding="utf-8") as f:
         _classification = json.load(f)
+    with open(PROCESSED_DATA_DIR / "meta.json", encoding="utf-8") as f:
+        _meta = json.load(f)
 
 
 def get_layer(name: str) -> dict:
@@ -60,6 +63,12 @@ def get_equipements() -> dict:
 
 def get_classification() -> list[dict]:
     return _classification
+
+
+def get_comptes() -> dict:
+    """Comptages d'anomalies relevés par l'ETL. Affichés sur /methodologie plutôt
+    qu'écrits en dur, pour qu'un changement de millésime les mette à jour."""
+    return _meta.get("comptes", {})
 
 
 def find_quartier(quartier_id: str) -> dict | None:
