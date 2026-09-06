@@ -6,6 +6,8 @@ sans dépendre de la présence de `data/raw/`.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import geopandas as gpd
 import pandas as pd
 import pytest
@@ -22,7 +24,8 @@ from etl.clean import (
     strip_strings,
     ajouter_surface_et_densite,
 )
-from gosp.services import scoring
+from etl import scores
+from gosp.services import data_store, scoring
 
 
 def _equipements(lignes: list[dict]) -> gpd.GeoDataFrame:
@@ -230,3 +233,17 @@ def test_ponderation_par_densite_et_par_population_coincident_sur_une_grille(mon
     assert panneau["pondere"] < panneau["brut"]
     assert panneau["surface_km2"] == 0.08
     assert panneau["densite_hab_km2"] == 12625.0
+
+
+def test_la_couche_batiments_n_est_plus_chargee_au_demarrage():
+    """Anomalie 9 : 8,8 Mo parsés à chaque démarrage de Flask, qu'aucune route ni
+    aucun gabarit ne lit. La couche reste une entrée d'ETL."""
+    source = Path(data_store.__file__).read_text(encoding="utf-8")
+    debut = source.index("def load_all()")
+    assert '"batiments"' not in source[debut:source.index("def get_layer")]
+
+
+def test_le_comblement_voiture_mort_a_ete_retire():
+    """Anomalie 8 : la fonction ne se déclenchait jamais, les colonnes voiture
+    étant présentes sur les sept quartiers."""
+    assert not hasattr(scores, "fill_missing_quartier_driving")

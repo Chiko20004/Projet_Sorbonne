@@ -308,6 +308,13 @@ def _rename_scores(gdf: gpd.GeoDataFrame, global_col_candidates: list[str]) -> g
 
 
 def load_batiments(raw_dir: Path) -> gpd.GeoDataFrame:
+    """Seule couche portant une population et un score par bâtiment.
+
+    Elle n'alimente aujourd'hui aucune sortie : l'agrégation se fait sur la
+    grille 200 m. Le chargeur reste ici parce que le fichier fait partie des
+    sources attendues par scripts/fetch_data.sh, et que le rattachement à un
+    découpage IRIS en aura besoin.
+    """
     gdf = gpd.read_file(raw_dir / "batiments_hqvs.geojson")
     gdf = gdf.rename(columns={"batiment_id": "id", "population_batiment": "population"})
     gdf = _rename_scores(gdf, ["score_hqvs_global"])

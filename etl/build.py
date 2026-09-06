@@ -61,14 +61,8 @@ def main() -> None:
     log(f"  -> dont {comptes['equipements_osm']} OSM, "
         f"{comptes['equipements_osm_rattaches']} rattachés à une fonction")
 
-    log("chargement bâtiments")
-    batiments = clean.load_batiments(RAW_DATA_DIR)
-    batiments.to_file(PROCESSED_DATA_DIR / "batiments.geojson", driver="GeoJSON")
-    log(f"  -> {len(batiments)} bâtiments")
-
-    log("chargement quartiers + comblement driving_car via bâtiments")
+    log("chargement quartiers")
     quartiers = clean.load_quartiers(RAW_DATA_DIR)
-    quartiers = scores.fill_missing_quartier_driving(quartiers, batiments)
     quartiers.to_file(PROCESSED_DATA_DIR / "quartiers.geojson", driver="GeoJSON")
     log(f"  -> {len(quartiers)} quartiers")
 

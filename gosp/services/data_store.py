@@ -33,7 +33,9 @@ def load_all() -> None:
             f"Données traitées introuvables dans {PROCESSED_DATA_DIR}. "
             "Lancer d'abord : python -m etl.build"
         )
-    for name in ("quartiers", "grille_200m", "grille_50m", "equipements", "batiments"):
+    # batiments.geojson n'est pas de la partie : 8,8 Mo qu'aucune route ni aucun
+    # gabarit ne lit, parsés à chaque démarrage. C'est une source d'ETL.
+    for name in ("quartiers", "grille_200m", "grille_50m", "equipements"):
         with open(PROCESSED_DATA_DIR / f"{name}.geojson", encoding="utf-8") as f:
             _layers[name] = json.load(f)
 
