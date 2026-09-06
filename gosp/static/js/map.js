@@ -115,6 +115,7 @@
       unite: data.get("unite"),
       niveau: data.get("niveau"),
       fonction: data.get("fonction"),
+      territoire: data.get("territoire"),
     };
   }
 
@@ -131,9 +132,12 @@
 
   function refreshEquipements() {
     var f = currentFilters();
+    // Le territoire part avec les autres filtres : la carte et le compteur du
+    // panneau interrogent ainsi le même jeu, et ne peuvent pas diverger.
     var qs = new URLSearchParams();
     if (f.fonction) qs.set("fonction", f.fonction);
     if (f.niveau) qs.set("niveau", f.niveau);
+    if (f.territoire) qs.set("territoire", f.territoire);
     fetch("/api/equipements?" + qs.toString())
       .then(function (r) { return r.json(); })
       .then(function (geojson) {

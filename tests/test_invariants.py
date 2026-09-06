@@ -11,6 +11,7 @@ import geopandas as gpd
 from shapely.geometry import Point, Polygon
 
 from etl.scores import rattacher_au_quartier
+from gosp.services import scoring
 
 # Deux quartiers voisins, chacun un carré d'environ 1 km de côté.
 QUARTIERS = gpd.GeoDataFrame(
@@ -61,3 +62,59 @@ def test_rattacher_au_quartier_marche_aussi_sur_des_polygones():
     )
     resultat = rattacher_au_quartier(cellules, QUARTIERS)
     assert resultat["quartier_id"].iloc[0] == "q1"
+
+
+def _couche(equipements: list[dict]) -> dict:
+    return {"features": [{"type": "Feature", "properties": p} for p in equipements]}
+
+
+ECHANTILLON = [
+    # Deux équipements sétois, l'un « habiter » de proximité, l'autre non classé.
+    {"uid": "bpe-A-1", "quartier_id": "q1", "niveau": "proximite", "habiter": 1.0},
+    {"uid": "bpe-A-2", "quartier_id": "q1", "niveau": None},
+    # Un équipement dans l'autre quartier.
+    {"uid": "bpe-A-3", "quartier_id": "q2", "niveau": "centralite", "travailler": 1.0},
+    # Un équipement de l'agglomération, hors des sept conseils de quartier.
+    {"uid": "bpe-A-4", "quartier_id": None, "niveau": "proximite", "habiter": 1.0},
+]
+
+
+def test_le_compteur_ecarte_les_equipements_hors_sete(monkeypatch):
+    """Le fichier couvre l'agglomération. Un compte annoncé comme sétois ne doit
+    pas inclure Montpellier."""
+    monkeypatch.setattr(scoring.data_store, "get_equipements", lambda: _couche(ECHANTILLON))
+    assert scoring.compter_equipements(None, None)["total"] == 3
+    uids = [f["properties"]["uid"] for f in scoring.filter_equipements(None, None)["features"]]
+    assert "bpe-A-4" not in uids
+
+
+def test_le_compteur_suit_la_fonction_le_niveau_et_le_territoire(monkeypatch):
+    """Invariant : un clic sur un secteur de la rosace met à jour le score et le
+    nombre d'équipements."""
+    monkeypatch.setattr(scoring.data_store, "get_equipements", lambda: _couche(ECHANTILLON))
+    assert scoring.compter_equipements("habiter", None)["total"] == 1
+    assert scoring.compter_equipements("travailler", None)["total"] == 1
+    assert scoring.compter_equipements(None, "proximite")["total"] == 1
+    assert scoring.compter_equipements(None, None, "q1")["total"] == 2
+    assert scoring.compter_equipements("habiter", None, "q2")["total"] == 0
+
+
+def test_le_compteur_annonce_a_part_les_equipements_sans_fonction(monkeypatch):
+    """Ces équipements disparaissent dès qu'un secteur est actif : n'afficher que
+    le total ferait mentir le compteur par omission."""
+    monkeypatch.setattr(scoring.data_store, "get_equipements", lambda: _couche(ECHANTILLON))
+    comptes = scoring.compter_equipements(None, None)
+    assert comptes["sans_fonction"] == 1
+    assert comptes["sur_le_territoire"] == 3
+
+
+def test_la_carte_et_le_compteur_voient_le_meme_jeu(monkeypatch):
+    """Ils passent par la même fonction de filtrage : ils ne peuvent pas diverger."""
+    monkeypatch.setattr(scoring.data_store, "get_equipements", lambda: _couche(ECHANTILLON))
+    for fonction, niveau, territoire in [
+        (None, None, None), ("habiter", None, None), (None, "proximite", "q1"),
+        ("travailler", "centralite", "q2"),
+    ]:
+        servis = scoring.filter_equipements(fonction, niveau, territoire)["features"]
+        compte = scoring.compter_equipements(fonction, niveau, territoire)["total"]
+        assert len(servis) == compte

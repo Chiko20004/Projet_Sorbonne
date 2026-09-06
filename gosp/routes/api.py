@@ -40,7 +40,8 @@ def map_layer():
 def equipements():
     fonction = request.args.get("fonction") or None
     niveau = request.args.get("niveau") or None
-    return jsonify(scoring.filter_equipements(fonction, niveau))
+    territoire = request.args.get("territoire") or None
+    return jsonify(scoring.filter_equipements(fonction, niveau, territoire))
 
 
 @bp.get("/isochrone/<equipement_uid>")

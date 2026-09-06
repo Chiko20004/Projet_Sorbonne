@@ -80,3 +80,27 @@ def test_api_isochrone_ne_signale_pas_les_contours_sains(client):
 def test_api_isochrone_404_for_unknown_id(client):
     assert client.get("/api/isochrone/999999999").status_code == 404
     assert client.get("/api/isochrone/bpe-A133-999999").status_code == 404
+
+
+def test_api_equipements_se_limite_a_sete(client):
+    """Le fichier source couvre toute l'agglomération : la carte ne doit servir
+    que les équipements sétois."""
+    tous = client.get("/api/equipements").get_json()["features"]
+    assert all(f["properties"]["quartier_id"] is not None for f in tous)
+    assert len(tous) == 2666
+
+
+def test_api_equipements_filtre_par_territoire(client):
+    tous = client.get("/api/equipements").get_json()["features"]
+    un_quartier = client.get("/api/equipements?territoire=1").get_json()["features"]
+    assert 0 < len(un_quartier) < len(tous)
+    assert all(str(f["properties"]["quartier_id"]) == "1" for f in un_quartier)
+
+
+def test_le_panneau_affiche_un_compteur_qui_suit_la_rosace(client):
+    """Invariant : le clic sur un secteur met à jour le score ET le nombre
+    d'équipements."""
+    sans = client.get("/exploration/panel?mode=walking&duree=15").data
+    avec = client.get("/exploration/panel?mode=walking&duree=15&fonction=habiter").data
+    assert "Équipements".encode() in sans
+    assert sans != avec
