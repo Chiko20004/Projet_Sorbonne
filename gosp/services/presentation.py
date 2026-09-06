@@ -39,8 +39,16 @@ def score_label(value) -> str:
 
 
 def nombre(valeur, decimales: int = 0) -> str:
-    """Écriture française : virgule décimale et espace insécable fine tous les
-    trois chiffres, comme « 4 099 » ou « 1,594 »."""
+    """Écriture française d'un nombre : virgule décimale et espace insécable fine
+    comme séparateur de milliers — « 4 099 », « 5,02 », « 1,594 ».
+
+    Renvoie le tiret cadratin quand la donnée manque, plutôt que « None » ou un
+    zéro qui se lirait comme une mesure.
+    """
     if valeur is None:
         return "—"
-    return f"{valeur:,.{decimales}f}".replace(",", "\u202f").replace(".", ",")
+    try:
+        formate = f"{float(valeur):,.{decimales}f}"
+    except (TypeError, ValueError):
+        return str(valeur)
+    return formate.replace(",", "\u202f").replace(".", ",")

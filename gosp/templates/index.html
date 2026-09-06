@@ -58,7 +58,7 @@
     {% for q in quartiers[:6] %}
     <a class="card card--quartier" href="/quartiers/{{ q.properties.id }}">
       <h3>{{ q.properties.nom }}</h3>
-      <span class="card__score {{ q.properties.score_global | score_class }}">{{ q.properties.score_global if q.properties.score_global is not none else "—" }} / 10</span>
+      <span class="card__score {{ q.properties.score_global | score_class }}">{{ q.properties.score_global | nombre(2) }} / 10</span>
       <span style="color: var(--color-text-faint); font-size: 0.85rem;">Score global, marche 15 min</span>
     </a>
     {% endfor %}

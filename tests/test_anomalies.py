@@ -25,7 +25,7 @@ from etl.clean import (
     ajouter_surface_et_densite,
 )
 from etl import scores
-from gosp.services import data_store, scoring
+from gosp.services import data_store, presentation, scoring
 
 
 def _equipements(lignes: list[dict]) -> gpd.GeoDataFrame:
@@ -247,3 +247,17 @@ def test_le_comblement_voiture_mort_a_ete_retire():
     """Anomalie 8 : la fonction ne se déclenchait jamais, les colonnes voiture
     étant présentes sur les sept quartiers."""
     assert not hasattr(scores, "fill_missing_quartier_driving")
+
+
+@pytest.mark.parametrize("valeur, decimales, attendu", [
+    (5.02, 2, "5,02"),
+    (4099, 0, "4 099"),
+    (43643.5, 0, "43 644"),
+    (1.594, 3, "1,594"),
+    (0.7133, 2, "0,71"),
+    (None, 2, "—"),
+])
+def test_nombre_ecrit_a_la_francaise(valeur, decimales, attendu):
+    """Convention du projet : virgule décimale, espace comme séparateur de
+    milliers, tiret quand la donnée manque."""
+    assert presentation.nombre(valeur, decimales) == attendu

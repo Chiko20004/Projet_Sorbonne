@@ -4,7 +4,7 @@
 {% set max_r = size * 0.34 %}
 {% set label_r = size * 0.44 %}
 <svg viewBox="0 0 {{ size }} {{ size }}" width="100%" height="100%" role="img"
-     aria-label="Radar des 6 fonctions sociales : {% for f, dx, dy in radar_axes %}{{ fonctions_labels[f] }} {{ values[f] if values[f] is not none else 'donnée indisponible' }}{{ ', ' if not loop.last }}{% endfor %}.">
+     aria-label="Radar des 6 fonctions sociales : {% for f, dx, dy in radar_axes %}{{ fonctions_labels[f] }} {{ values[f] | nombre(2) if values[f] is not none else 'donnée indisponible' }}{{ ', ' if not loop.last }}{% endfor %}.">
   <g>
     {% for ring in [2, 4, 6, 8, 10] %}
     <polygon
@@ -52,7 +52,7 @@
           fill="{{ values[f] | score_color }}" fill-opacity="{{ '1' if (active_fonction == f or not active_fonction) else '0.35' }}"
           stroke="var(--color-bg-card)" stroke-width="1.5"
           role="button" tabindex="0" aria-pressed="{{ 'true' if active_fonction == f else 'false' }}"
-          aria-label="{{ fonctions_labels_g[f] }} : {{ values[f] if values[f] is not none else 'donnée indisponible' }} sur 10, {{ values[f] | score_label }}. Filtrer la carte sur cette fonction." />
+          aria-label="{{ fonctions_labels_g[f] }} : {{ values[f] | nombre(2) if values[f] is not none else 'donnée indisponible' }} sur 10, {{ values[f] | score_label }}. Filtrer la carte sur cette fonction." />
   {% endfor %}
   <circle class="rosace-center" data-fonction="" cx="{{ cx }}" cy="{{ cy }}" r="{{ min_r - 2 }}"
           fill="var(--color-bg-elevated)" stroke="var(--color-border-strong)" stroke-width="1.5"

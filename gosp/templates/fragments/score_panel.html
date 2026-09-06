@@ -9,15 +9,15 @@
 
   <div class="panel__stat">
     <span class="panel__stat-label">Score HQVS pondéré (densité de population)</span>
-    <span class="panel__stat-value {{ panel.pondere | score_class }}">{{ panel.pondere if panel.pondere is not none else "—" }}<span style="font-size:1rem; color:var(--color-text-faint);"> / 10</span></span>
-    <span class="panel__stat-sub">Score brut (non pondéré) : {{ panel.brut if panel.brut is not none else "—" }} / 10 · {{ panel.n_cellules }} cellules · {{ panel.population_totale | nombre }} hab.</span>
+    <span class="panel__stat-value {{ panel.pondere | score_class }}">{{ panel.pondere | nombre(2) }}<span style="font-size:1rem; color:var(--color-text-faint);"> / 10</span></span>
+    <span class="panel__stat-sub">Score brut (non pondéré) : {{ panel.brut | nombre(2) }} / 10 · {{ panel.n_cellules | nombre }} cellules · {{ panel.population_totale | nombre }} hab.</span>
     <span class="panel__stat-sub">{{ panel.surface_km2 | nombre(2) }} km² · {{ panel.densite_hab_km2 | nombre }} hab./km², densité qui sert de pondération</span>
   </div>
 
   {% if a_ameliorer %}
   <p class="note" style="border-color: var(--score-0);">
-    <strong style="color: var(--score-0-text);">À améliorer :</strong> {{ fonctions_labels[a_ameliorer[0]] }} ({{ a_ameliorer[1] }}/10)
-    {% if mieux_desservi %} · <strong style="color: var(--score-9-text);">Mieux desservi :</strong> {{ fonctions_labels[mieux_desservi[0]] }} ({{ mieux_desservi[1] }}/10){% endif %}
+    <strong style="color: var(--score-0-text);">À améliorer :</strong> {{ fonctions_labels[a_ameliorer[0]] }} ({{ a_ameliorer[1] | nombre(2) }}/10)
+    {% if mieux_desservi %} · <strong style="color: var(--score-9-text);">Mieux desservi :</strong> {{ fonctions_labels[mieux_desservi[0]] }} ({{ mieux_desservi[1] | nombre(2) }}/10){% endif %}
   </p>
   {% endif %}
 
@@ -44,7 +44,7 @@
   {% endif %}
 
   {% if combinee_15_30 is not none %}
-  <p class="note">Score combiné 15/30 min (moyenne géométrique, proposition ouverte) : <strong>{{ combinee_15_30 }} / 10</strong></p>
+  <p class="note">Score combiné 15/30 min (moyenne géométrique, proposition ouverte) : <strong>{{ combinee_15_30 | nombre(2) }} / 10</strong></p>
   {% endif %}
 
   <details class="accordion">
@@ -54,7 +54,7 @@
         <thead><tr><th>Fonction</th><th>Score</th><th>Niveau</th></tr></thead>
         <tbody>
         {% for f, label in fonctions_labels.items() %}
-          <tr><td>{{ label }}</td><td class="mono">{{ radar.valeurs[f] if radar.valeurs[f] is not none else "—" }}</td><td>{{ radar.valeurs[f] | score_label }}</td></tr>
+          <tr><td>{{ label }}</td><td class="mono">{{ radar.valeurs[f] | nombre(2) }}</td><td>{{ radar.valeurs[f] | score_label }}</td></tr>
         {% endfor %}
         </tbody>
       </table>

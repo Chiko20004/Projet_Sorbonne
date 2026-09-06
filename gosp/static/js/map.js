@@ -16,6 +16,16 @@
     9: "#2f8f4e",
   };
 
+  // Écriture française des nombres, comme le filtre `nombre` côté serveur :
+  // les libellés de la carte doivent se lire comme le reste du site.
+  function nombreFr(valeur, decimales) {
+    if (valeur === null || valeur === undefined) return "—";
+    return Number(valeur).toLocaleString("fr-FR", {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    });
+  }
+
   function colorFor(score) {
     if (score === null || score === undefined) return SCORE_COLORS.nodata;
     if (score < 3) return SCORE_COLORS[0];
@@ -47,8 +57,11 @@
     onEachFeature: function (feature, layer) {
       var p = feature.properties;
       var label = p.nom || ("Cellule " + p.id);
-      var scoreTxt = p.score !== null && p.score !== undefined ? p.score + " / 10" : "donnée indisponible";
-      layer.bindTooltip(label + " — " + scoreTxt);
+      var scoreTxt = p.score !== null && p.score !== undefined
+        ? nombreFr(p.score, 2) + " / 10"
+        : "donnée indisponible";
+      var habTxt = p.population ? " · " + nombreFr(p.population, 0) + " hab." : "";
+      layer.bindTooltip(label + " — " + scoreTxt + habTxt);
     },
   }).addTo(map);
 
