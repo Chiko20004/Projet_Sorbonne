@@ -53,6 +53,11 @@ MODE_LABELS = {
 
 DUREES = [15, 30]
 
+# Combinaison de référence. C'est la seule pour laquelle les données fournissent une
+# géométrie d'isochrone, et celle à laquelle le radar rapporte ses scores de fonction.
+MODE_REFERENCE = "walking"
+DUREE_REFERENCE = 15
+
 NIVEAUX_PROXIMITE = ["proximite", "intermediaire", "centralite"]
 
 NIVEAU_LABELS = {

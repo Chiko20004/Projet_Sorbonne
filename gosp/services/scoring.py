@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 
-from config import FONCTIONS
+from config import DUREE_REFERENCE, FONCTIONS, MODE_REFERENCE
 from gosp.services import data_store
 
 
@@ -85,12 +85,20 @@ def radar(quartier_id: str | None, mode: str, duree: int) -> dict:
     données sources que sous une forme non ventilée par mode/durée — il n'y a
     pas de matrice fonction x mode x durée. Approximation documentée
     (/methodologie) : on part de la valeur de référence par fonction, mise à
-    l'échelle par le ratio entre le score global du mode/durée sélectionné et
-    le score global de référence, pour refléter le changement de niveau
-    d'accessibilité sans inventer une ventilation qui n'existe pas."""
+    l'échelle par le rapport entre le score du mode/durée sélectionné et celui
+    de la combinaison de référence, pour refléter le changement de niveau
+    d'accessibilité sans inventer une ventilation qui n'existe pas.
+
+    La référence est `score_walking_15`, et non `score_global`. `score_global`
+    est la moyenne des six scores de fonction, sans mode ni durée : le rapport
+    entre les deux ne mesure rien. Il valait 0,307 à Saint Clair, où le radar
+    affichait donc des fonctions rabotées de 69 % — en marche 15 min, c'est-à-dire
+    sur la vue par défaut, où l'approximation ne devrait pas exister. Avec la
+    bonne référence, le rapport vaut exactement 1,0 dans ce cas.
+    """
     cells = _populated_cells(quartier_id)
     reference = {f: _weighted_mean(cells, f"score_{f}") for f in FONCTIONS}
-    ref_global = _weighted_mean(cells, "score_global")
+    ref_global = _weighted_mean(cells, score_key(MODE_REFERENCE, DUREE_REFERENCE))
     target_global = _weighted_mean(cells, score_key(mode, duree))
 
     ratio = 1.0
@@ -105,7 +113,7 @@ def radar(quartier_id: str | None, mode: str, duree: int) -> dict:
         "reference": reference,
         "valeurs": approx,
         "ratio_approximation": round(ratio, 3),
-        "est_approximation": duree != 15 or mode != "walking",
+        "est_approximation": (mode, duree) != (MODE_REFERENCE, DUREE_REFERENCE),
     }
 
 

@@ -41,11 +41,15 @@
     forme <strong>non ventilée par mode/durée</strong>, et séparément un score global par
     combinaison mode/durée (marche 15, marche 30, vélo 15/30, voiture 15/30) — mais pas la
     matrice croisée des deux. Quand vous changez de mode ou de durée sur la page Exploration,
-    le radar affiche donc une <strong>approximation</strong> : chaque score de fonction de
-    référence est mis à l'échelle par le ratio entre le score global du mode/durée choisi et le
-    score global de référence. Cela préserve la forme relative du radar (quelles fonctions sont
-    mieux ou moins bien desservies) mais n'est pas une mesure directe — une ventilation
-    complète nécessiterait un recalcul en amont, hors du périmètre des données fournies.</p>
+    le radar affiche donc une <strong>approximation</strong> : chaque score de fonction est mis
+    à l'échelle par le rapport entre le score du mode/durée choisi et celui de la
+    <strong>marche 15 min</strong>, prise comme combinaison de référence. Cela préserve la forme
+    relative du radar (quelles fonctions sont mieux ou moins bien desservies) mais n'est pas une
+    mesure directe — une ventilation complète nécessiterait un recalcul en amont, hors du
+    périmètre des données fournies.</p>
+  <p>En marche 15 min, le rapport vaut donc exactement 1,0 et le radar affiche les scores de
+    fonction tels quels, sans mise à l'échelle. C'est le comportement attendu : sur la
+    combinaison de référence, il n'y a rien à approximer.</p>
 
   <h3>Combinaison 15 min / 30 min (proposition ouverte)</h3>
   <p>Le score par palier de proximité (15 min vs 30 min) reste indépendant par défaut : vous

@@ -38,9 +38,9 @@ def score_label(value) -> str:
     return "très bon"
 
 
-def nombre(valeur) -> str:
-    """Écriture française d'un entier : espace insécable fine tous les trois
-    chiffres, comme « 4 099 »."""
+def nombre(valeur, decimales: int = 0) -> str:
+    """Écriture française : virgule décimale et espace insécable fine tous les
+    trois chiffres, comme « 4 099 » ou « 1,594 »."""
     if valeur is None:
         return "—"
-    return f"{int(valeur):,}".replace(",", "\u202f")
+    return f"{valeur:,.{decimales}f}".replace(",", "\u202f").replace(".", ",")

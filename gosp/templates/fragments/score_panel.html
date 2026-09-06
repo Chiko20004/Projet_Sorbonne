@@ -33,8 +33,8 @@
 
   {% if radar.est_approximation %}
   <p class="note">
-    Radar en <strong>{{ modes[filters.mode] }} {{ filters.duree }} min</strong> : les données sources ne détaillent le score par fonction que pour un mode de référence.
-    Les valeurs ci-dessus sont donc une <strong>approximation</strong> (mise à l'échelle par le ratio {{ radar.ratio_approximation }} entre le score global de ce mode/durée et le score global de référence) — voir <a href="/methodologie#radar-approximation">Méthodologie</a>.
+    Radar en <strong>{{ modes[filters.mode] }} {{ filters.duree }} min</strong> : les données sources ne détaillent le score par fonction qu'en marche 15 min.
+    Les valeurs ci-dessus sont donc une <strong>approximation</strong>, mise à l'échelle par le rapport {{ radar.ratio_approximation | nombre(3) }} entre le score de ce mode/durée et celui de la marche 15 min — voir <a href="/methodologie#radar-approximation">Méthodologie</a>.
   </p>
   {% endif %}
 

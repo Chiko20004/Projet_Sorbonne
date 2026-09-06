@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 from shapely.geometry import Point
 
-from config import FONCTIONS, OSM_TYPEQU_CORRESPONDANCE
+from config import DUREE_REFERENCE, FONCTIONS, MODE_REFERENCE, OSM_TYPEQU_CORRESPONDANCE
 from etl.clean import (
     COLONNES_CLASSEES,
     _appliquer_classification,
@@ -21,6 +21,7 @@ from etl.clean import (
     normaliser_typequ,
     strip_strings,
 )
+from gosp.services import scoring
 
 
 def _equipements(lignes: list[dict]) -> gpd.GeoDataFrame:
@@ -169,3 +170,28 @@ def test_les_equipements_non_classes_sont_marques():
     assert resultat["classe"].tolist() == [True, False]
     assert bool(resultat["habiter"].iloc[0]) is True
     assert pd.isna(resultat["habiter"].iloc[1])
+
+
+def test_le_radar_ne_rabote_pas_la_combinaison_de_reference(monkeypatch):
+    """Anomalie 6 : le rapport divisait par score_global, moyenne des six scores
+    de fonction sans mode ni durée. À Saint Clair il valait 0,307, donc le radar
+    rabotait les six fonctions de 69 % — en marche 15 min, sur la vue par défaut,
+    là où il n'y a précisément rien à approximer."""
+    cellules = [{
+        "peuplee": True, "population": 100.0, "quartier_id": "1",
+        "score_global": 5.38, "score_walking_15": 1.65, "score_cycling_30": 3.30,
+        **{f"score_{f}": 5.0 for f in FONCTIONS},
+    }]
+    monkeypatch.setattr(scoring.data_store, "get_grille",
+                        lambda _: {"features": [{"properties": c} for c in cellules]})
+
+    reference = scoring.radar("1", MODE_REFERENCE, DUREE_REFERENCE)
+    assert reference["ratio_approximation"] == 1.0
+    assert reference["est_approximation"] is False
+    assert all(v == 5.0 for v in reference["valeurs"].values())
+
+    # Hors référence, la mise à l'échelle reste relative à la marche 15 min.
+    autre = scoring.radar("1", "cycling", 30)
+    assert autre["ratio_approximation"] == 2.0
+    assert autre["est_approximation"] is True
+    assert all(v == 10.0 for v in autre["valeurs"].values())
