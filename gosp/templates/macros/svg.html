@@ -1,10 +1,15 @@
-{% macro radar_svg(values, fonctions_labels, size=280) %}
+{% macro radar_svg(values, fonctions_labels, size=280, active_fonction=None) %}
 {% set cx = size / 2 %}
 {% set cy = size / 2 %}
 {% set max_r = size * 0.34 %}
 {% set label_r = size * 0.44 %}
+{#
+  La fonction active se distingue par trois marqueurs cumulés : axe épaissi,
+  point agrandi et cerclé, libellé en gras. Aucun ne repose sur la couleur —
+  l'accessibilité demandée interdit d'en faire le seul vecteur d'information.
+#}
 <svg viewBox="0 0 {{ size }} {{ size }}" width="100%" height="100%" role="img"
-     aria-label="Radar des 6 fonctions sociales : {% for f, dx, dy in radar_axes %}{{ fonctions_labels[f] }} {{ values[f] | nombre(2) if values[f] is not none else 'donnée indisponible' }}{{ ', ' if not loop.last }}{% endfor %}.">
+     aria-label="Radar des 6 fonctions sociales{% if active_fonction %}, {{ fonctions_labels[active_fonction] }} mise en évidence{% endif %} : {% for f, dx, dy in radar_axes %}{{ fonctions_labels[f] }} {{ values[f] | nombre(2) if values[f] is not none else 'donnée indisponible' }}{{ ', ' if not loop.last }}{% endfor %}.">
   <g>
     {% for ring in [2, 4, 6, 8, 10] %}
     <polygon
@@ -12,18 +17,30 @@
       fill="none" stroke="var(--color-border-strong)" stroke-width="1" />
     {% endfor %}
     {% for f, dx, dy in radar_axes %}
-    <line x1="{{ cx }}" y1="{{ cy }}" x2="{{ (cx + dx * max_r) | round(1) }}" y2="{{ (cy + dy * max_r) | round(1) }}"
-          stroke="var(--color-border-strong)" stroke-width="1" />
+    {% set actif = active_fonction == f %}
+    <line class="radar-axe{{ ' radar-axe--actif' if actif }}" data-fonction="{{ f }}"
+          x1="{{ cx }}" y1="{{ cy }}" x2="{{ (cx + dx * max_r) | round(1) }}" y2="{{ (cy + dy * max_r) | round(1) }}"
+          stroke="{{ 'var(--color-or)' if actif else 'var(--color-border-strong)' }}"
+          stroke-width="{{ 3 if actif else 1 }}" />
     {% endfor %}
     <polygon
       points="{% for f, dx, dy in radar_axes %}{% set v = values[f] if values[f] is not none else 0 %}{{ (cx + dx * max_r * v / 10) | round(1) }},{{ (cy + dy * max_r * v / 10) | round(1) }}{{ ' ' if not loop.last }}{% endfor %}"
       fill="var(--color-corail-text)" fill-opacity="0.35" stroke="var(--color-corail-text)" stroke-width="2" />
     {% for f, dx, dy in radar_axes %}
       {% set v = values[f] %}
+      {% set actif = active_fonction == f %}
       {% if v is not none %}
-      <circle cx="{{ (cx + dx * max_r * v / 10) | round(1) }}" cy="{{ (cy + dy * max_r * v / 10) | round(1) }}" r="3.5" fill="var(--color-or)" />
+      {% if actif %}
+      <circle class="radar-halo" cx="{{ (cx + dx * max_r * v / 10) | round(1) }}" cy="{{ (cy + dy * max_r * v / 10) | round(1) }}"
+              r="9" fill="none" stroke="var(--color-or)" stroke-width="2" />
       {% endif %}
-      <text class="rosace-label" x="{{ (cx + dx * label_r) | round(1) }}" y="{{ (cy + dy * label_r) | round(1) }}"
+      <circle class="radar-point{{ ' radar-point--actif' if actif }}" data-fonction="{{ f }}"
+              cx="{{ (cx + dx * max_r * v / 10) | round(1) }}" cy="{{ (cy + dy * max_r * v / 10) | round(1) }}"
+              r="{{ 6 if actif else 3.5 }}" fill="var(--color-or)" />
+      {% endif %}
+      <text class="rosace-label{{ ' radar-label--actif' if actif }}" data-fonction="{{ f }}"
+            x="{{ (cx + dx * label_r) | round(1) }}" y="{{ (cy + dy * label_r) | round(1) }}"
+            font-weight="{{ 700 if actif else 400 }}"
             text-anchor="{{ 'middle' if dx|abs < 0.3 else ('start' if dx > 0 else 'end') }}"
             dominant-baseline="{{ 'baseline' if dy < -0.3 else ('hanging' if dy > 0.3 else 'middle') }}">
         {{ fonctions_labels[f] }}

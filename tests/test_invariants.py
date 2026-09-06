@@ -7,10 +7,14 @@ sans `data/raw/`.
 """
 from __future__ import annotations
 
+import re
+
 import geopandas as gpd
 from shapely.geometry import Point, Polygon
 
+from config import FONCTIONS, FONCTIONS_LABELS, RADAR_AXES
 from etl.scores import rattacher_au_quartier
+from gosp import create_app
 from gosp.services import scoring
 
 # Deux quartiers voisins, chacun un carré d'environ 1 km de côté.
@@ -118,3 +122,56 @@ def test_la_carte_et_le_compteur_voient_le_meme_jeu(monkeypatch):
         servis = scoring.filter_equipements(fonction, niveau, territoire)["features"]
         compte = scoring.compter_equipements(fonction, niveau, territoire)["total"]
         assert len(servis) == compte
+
+
+def _rendre_radar(active_fonction):
+    """Rend la macro seule, sans passer par une route."""
+    app = create_app()
+    with app.app_context():
+        gabarit = app.jinja_env.from_string(
+            '{% from "macros/svg.html" import radar_svg with context %}'
+            "{{ radar_svg(valeurs, fonctions_labels, 260, active) }}"
+        )
+        return gabarit.render(
+            valeurs={f: 5.0 for f in FONCTIONS},
+            fonctions_labels=FONCTIONS_LABELS,
+            active=active_fonction,
+            radar_axes=RADAR_AXES,
+            fonctions_labels_g=FONCTIONS_LABELS,
+        )
+
+
+def test_le_radar_met_en_evidence_la_fonction_cliquee():
+    """Invariant : le radar doit mettre en évidence la fonction cliquée. Il ne
+    recevait pas `active_fonction` du tout."""
+    rendu = _rendre_radar("apprendre")
+    axe = re.search(r'<line[^>]*data-fonction="apprendre"[^>]*>', rendu).group(0)
+    point = re.search(r'<circle class="radar-point[^"]*"[^>]*data-fonction="apprendre"[^>]*>', rendu).group(0)
+    libelle = re.search(r'<text[^>]*data-fonction="apprendre"[^>]*>', rendu).group(0)
+
+    assert "radar-axe--actif" in axe
+    assert "radar-point--actif" in point
+    assert 'font-weight="700"' in libelle
+    assert "radar-halo" in rendu
+
+
+def test_le_radar_ne_signale_pas_la_fonction_active_par_la_seule_couleur():
+    """L'accessibilité demandée interdit la couleur comme seul vecteur
+    d'information : l'épaisseur, la taille et la graisse doivent aussi changer."""
+    actif = _rendre_radar("apprendre")
+    axe_actif = re.search(r'<line[^>]*data-fonction="apprendre"[^>]*>', actif).group(0)
+    point_actif = re.search(r'<circle class="radar-point[^"]*"[^>]*data-fonction="apprendre"[^>]*>', actif).group(0)
+
+    neutre = _rendre_radar(None)
+    axe_neutre = re.search(r'<line[^>]*data-fonction="apprendre"[^>]*>', neutre).group(0)
+    point_neutre = re.search(r'<circle class="radar-point[^"]*"[^>]*data-fonction="apprendre"[^>]*>', neutre).group(0)
+
+    assert 'stroke-width="3"' in axe_actif and 'stroke-width="1"' in axe_neutre
+    assert 'r="6"' in point_actif and 'r="3.5"' in point_neutre
+    assert "radar-halo" not in neutre
+
+
+def test_le_radar_nomme_la_fonction_active_pour_les_lecteurs_d_ecran():
+    """Sans ça, la mise en évidence n'existe que pour ceux qui voient."""
+    assert "Apprendre mise en évidence" in _rendre_radar("apprendre")
+    assert "mise en évidence" not in _rendre_radar(None)

@@ -48,8 +48,8 @@
       {{ rosace_svg(radar.valeurs, filters.fonction, 260) }}
     </div>
     <div class="svg-widget">
-      <h4>Radar des 6 fonctions <span class="help-icon" tabindex="0" aria-label="Aide">?<span class="visually-hidden">Score de 0 à 10 pour chacune des 6 fonctions sociales, sur le territoire sélectionné.</span></span></h4>
-      {{ radar_svg(radar.valeurs, fonctions_labels, 260) }}
+      <h4>Radar des 6 fonctions <span class="help-icon" tabindex="0" aria-label="Aide">?<span class="visually-hidden">Score de 0 à 10 pour chacune des 6 fonctions sociales, sur le territoire sélectionné. La fonction choisie dans la rosace y est mise en évidence : axe épaissi, point cerclé, libellé en gras.</span></span></h4>
+      {{ radar_svg(radar.valeurs, fonctions_labels, 260, filters.fonction) }}
     </div>
   </div>
 
