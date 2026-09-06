@@ -32,6 +32,17 @@ FONCTIONS_LABELS = {
     "s_approvisionner": "S'approvisionner",
 }
 
+# osm_equipements.geojson code ses équipements OSM1/OSM2/OSM3, alors que la table
+# de classification les nomme OSM_BUS/OSM_COWORK/OSM_PARC. Le recouvrement est nul,
+# donc la jointure ne rattachait rien et les 662 équipements OSM se retrouvaient
+# sans fonction ni niveau. La correspondance est levée par le libellé du fichier :
+# « Arret de bus » (558), « Cowork » (7), « Parc et jardin » (97).
+OSM_TYPEQU_CORRESPONDANCE = {
+    "OSM1": "OSM_BUS",
+    "OSM2": "OSM_COWORK",
+    "OSM3": "OSM_PARC",
+}
+
 MODES = ["walking", "cycling", "driving_car"]
 
 MODE_LABELS = {
@@ -41,6 +52,11 @@ MODE_LABELS = {
 }
 
 DUREES = [15, 30]
+
+# Combinaison de référence. C'est la seule pour laquelle les données fournissent une
+# géométrie d'isochrone, et celle à laquelle le radar rapporte ses scores de fonction.
+MODE_REFERENCE = "walking"
+DUREE_REFERENCE = 15
 
 NIVEAUX_PROXIMITE = ["proximite", "intermediaire", "centralite"]
 

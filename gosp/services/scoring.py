@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 
-from config import FONCTIONS
+from config import DUREE_REFERENCE, FONCTIONS, MODE_REFERENCE
 from gosp.services import data_store
 
 
@@ -53,17 +53,29 @@ def _weighted_mean(cells: list[dict], key: str, weight_key: str = "population") 
 
 
 def score_panel(quartier_id: str | None, mode: str, duree: int) -> dict:
-    """Le score 'pondéré' est une moyenne
-    pondérée par la population des cellules, distincte du score 'brut'
-    (moyenne arithmétique simple), pour qu'une zone peu peuplée à score élevé
-    ne pèse pas autant qu'une zone dense au même score."""
+    """Score pondéré par la densité de population, à côté du score brut (moyenne
+    arithmétique simple), pour qu'une zone peu peuplée à score élevé ne pèse pas
+    autant qu'une zone dense au même score.
+
+    La pondération porte bien sur la densité, et non plus sur la population : le
+    panneau annonçait la première tout en calculant la seconde, et `surf_km2`
+    n'était renseignée nulle part. Sur la grille 200 m, les deux donnent le même
+    chiffre — les cellules mesurent toutes 0,0400 km² à deux dix-millièmes près,
+    et une moyenne pondérée ne dépend pas de l'échelle du poids. L'écart
+    n'apparaît qu'entre unités de tailles différentes : les sept quartiers vont
+    de 0,71 à 15,67 km². C'est pour eux, et pour les IRIS à venir, que le calcul
+    est fait explicitement.
+    """
     cells = _populated_cells(quartier_id)
     key = score_key(mode, duree)
     population_totale = sum(c["population"] for c in cells if c.get("population"))
+    surface_totale = sum(c.get("surf_km2") or 0.0 for c in cells)
     return {
         "brut": _arithmetic_mean(cells, key),
-        "pondere": _weighted_mean(cells, key),
+        "pondere": _weighted_mean(cells, key, weight_key="densite_hab_km2"),
         "population_totale": round(population_totale, 1),
+        "surface_km2": round(surface_totale, 2) if surface_totale else None,
+        "densite_hab_km2": round(population_totale / surface_totale, 1) if surface_totale else None,
         "n_cellules": len(cells),
     }
 
@@ -85,12 +97,20 @@ def radar(quartier_id: str | None, mode: str, duree: int) -> dict:
     données sources que sous une forme non ventilée par mode/durée — il n'y a
     pas de matrice fonction x mode x durée. Approximation documentée
     (/methodologie) : on part de la valeur de référence par fonction, mise à
-    l'échelle par le ratio entre le score global du mode/durée sélectionné et
-    le score global de référence, pour refléter le changement de niveau
-    d'accessibilité sans inventer une ventilation qui n'existe pas."""
+    l'échelle par le rapport entre le score du mode/durée sélectionné et celui
+    de la combinaison de référence, pour refléter le changement de niveau
+    d'accessibilité sans inventer une ventilation qui n'existe pas.
+
+    La référence est `score_walking_15`, et non `score_global`. `score_global`
+    est la moyenne des six scores de fonction, sans mode ni durée : le rapport
+    entre les deux ne mesure rien. Il valait 0,307 à Saint Clair, où le radar
+    affichait donc des fonctions rabotées de 69 % — en marche 15 min, c'est-à-dire
+    sur la vue par défaut, où l'approximation ne devrait pas exister. Avec la
+    bonne référence, le rapport vaut exactement 1,0 dans ce cas.
+    """
     cells = _populated_cells(quartier_id)
     reference = {f: _weighted_mean(cells, f"score_{f}") for f in FONCTIONS}
-    ref_global = _weighted_mean(cells, "score_global")
+    ref_global = _weighted_mean(cells, score_key(MODE_REFERENCE, DUREE_REFERENCE))
     target_global = _weighted_mean(cells, score_key(mode, duree))
 
     ratio = 1.0
@@ -105,7 +125,7 @@ def radar(quartier_id: str | None, mode: str, duree: int) -> dict:
         "reference": reference,
         "valeurs": approx,
         "ratio_approximation": round(ratio, 3),
-        "est_approximation": duree != 15 or mode != "walking",
+        "est_approximation": (mode, duree) != (MODE_REFERENCE, DUREE_REFERENCE),
     }
 
 

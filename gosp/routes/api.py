@@ -43,9 +43,9 @@ def equipements():
     return jsonify(scoring.filter_equipements(fonction, niveau))
 
 
-@bp.get("/isochrone/<int:equipement_id>")
-def isochrone(equipement_id: int):
-    feature = data_store.get_isochrone(equipement_id)
+@bp.get("/isochrone/<equipement_uid>")
+def isochrone(equipement_uid: str):
+    feature = data_store.get_isochrone(equipement_uid)
     if feature is None:
         return jsonify({"error": "isochrone_introuvable"}), 404
     return jsonify(feature)

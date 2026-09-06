@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request
 
 from config import (
-    DUREES, FONCTIONS, FONCTIONS_LABELS, MODE_LABELS, MODES,
-    NIVEAU_LABELS, NIVEAUX_PROXIMITE, UNITE_LABELS, UNITES_SPATIALES,
+    DUREE_REFERENCE, DUREES, FONCTIONS, FONCTIONS_LABELS, MODE_LABELS, MODE_REFERENCE,
+    MODES, NIVEAU_LABELS, NIVEAUX_PROXIMITE, UNITE_LABELS, UNITES_SPATIALES,
 )
 from gosp.services import data_store, scoring
 
@@ -61,7 +61,7 @@ def _build_panel_context(filters: dict) -> dict:
         "mieux_desservi": mieux_desservi,
         "fonctions_labels": FONCTIONS_LABELS,
         "modes": MODE_LABELS,
-        "isochrone_disponible": filters["mode"] == "walking" and filters["duree"] == 15,
+        "isochrone_disponible": (filters["mode"], filters["duree"]) == (MODE_REFERENCE, DUREE_REFERENCE),
     }
 
 

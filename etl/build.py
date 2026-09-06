@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import PROCESSED_DATA_DIR, RAW_DATA_DIR, ISOCHRONE_SIMPLIFY_TOLERANCE
+from config import FONCTIONS, PROCESSED_DATA_DIR, RAW_DATA_DIR, ISOCHRONE_SIMPLIFY_TOLERANCE
 from etl import clean, isochrones, scores
 
 
@@ -25,6 +25,10 @@ def log(msg: str) -> None:
 def main() -> None:
     t0 = time.time()
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # Les anomalies des données sources sont recomptées à chaque exécution plutôt
+    # qu'écrites en dur quelque part : un changement de millésime doit faire bouger
+    # les chiffres affichés sur /methodologie, pas les laisser mentir.
+    comptes: dict[str, int] = {}
 
     log("chargement classification.csv")
     classification = clean.load_classification(RAW_DATA_DIR)
@@ -34,14 +38,31 @@ def main() -> None:
     equipements.to_file(PROCESSED_DATA_DIR / "equipements.geojson", driver="GeoJSON")
     log(f"  -> {len(equipements)} équipements")
 
-    log("chargement bâtiments")
-    batiments = clean.load_batiments(RAW_DATA_DIR)
-    batiments.to_file(PROCESSED_DATA_DIR / "batiments.geojson", driver="GeoJSON")
-    log(f"  -> {len(batiments)} bâtiments")
+    comptes.update(equipements.attrs.get("comptes", {}))
+    log(f"  -> niveau : {comptes.get('divergences_niveau')} écart(s) entre le fichier "
+        f"et la classification, sur {comptes.get('equipements_a_code_connu')} codes connus")
+    log(f"  -> booléens du fichier écartés : {comptes.get('divergences_proximite')} sur proximite, "
+        f"{comptes.get('divergences_intermediaire')} sur intermediaire, "
+        f"{comptes.get('divergences_centralite')} sur centralite")
 
-    log("chargement quartiers + comblement driving_car via bâtiments")
+    comptes["equipements_non_classes"] = int((~equipements["classe"]).sum())
+    comptes["equipements_rattrapes_par_libelle"] = int(
+        (equipements["classe"] & (equipements["typequ"] != equipements["typequ_classe"])
+         & (equipements["source"] == "bpe")).sum()
+    )
+    log(f"  -> {comptes['equipements_rattrapes_par_libelle']} rattrapés par leur libellé, "
+        f"{comptes['equipements_non_classes']} restent sans fonction connue")
+
+    osm = equipements[equipements["source"] == "osm"]
+    comptes["equipements_osm"] = len(osm)
+    comptes["equipements_osm_rattaches"] = int(
+        osm[FONCTIONS].fillna(False).astype(bool).any(axis=1).sum()
+    )
+    log(f"  -> dont {comptes['equipements_osm']} OSM, "
+        f"{comptes['equipements_osm_rattaches']} rattachés à une fonction")
+
+    log("chargement quartiers")
     quartiers = clean.load_quartiers(RAW_DATA_DIR)
-    quartiers = scores.fill_missing_quartier_driving(quartiers, batiments)
     quartiers.to_file(PROCESSED_DATA_DIR / "quartiers.geojson", driver="GeoJSON")
     log(f"  -> {len(quartiers)} quartiers")
 
@@ -60,18 +81,25 @@ def main() -> None:
     )
 
     log("conversion isochrones (122 Mo) -> GeoPackage indexé + simplifié")
-    isochrones.build_isochrones_store(
+    comptes_isochrones = isochrones.build_isochrones_store(
         RAW_DATA_DIR / "isochrones_walking_15min.geojson",
         PROCESSED_DATA_DIR / "isochrones.gpkg",
         ISOCHRONE_SIMPLIFY_TOLERANCE,
+        equipements,
     )
     size_mb = (PROCESSED_DATA_DIR / "isochrones.gpkg").stat().st_size / 1e6
     log(f"  -> isochrones.gpkg ({size_mb:.1f} Mo)")
+    log(f"  -> {comptes_isochrones['equipements_avec_isochrone']} équipements rattachés, "
+        f"{comptes_isochrones['isochrones_sans_equipement']} isochrones orphelines")
+    log(f"  -> {comptes_isochrones['isochrones_fusionnees']} contours issus d'un "
+        "identifiant ambigu, signalés dans l'interface")
+    comptes.update(comptes_isochrones)
 
     meta = {
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "raw_data_dir": str(RAW_DATA_DIR),
         "duration_seconds": round(time.time() - t0, 1),
+        "comptes": comptes,
     }
     (PROCESSED_DATA_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
     log(f"terminé en {meta['duration_seconds']}s")

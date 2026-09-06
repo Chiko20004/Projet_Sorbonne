@@ -30,8 +30,14 @@
     territoire : un score élevé sur une zone peu peuplée compte alors autant qu'un score élevé
     sur une zone dense. Ce site introduit un second indicateur, le <strong>score pondéré</strong>,
     calculé comme une moyenne des scores des cellules de la grille 200 m, pondérée par la
-    population de chaque cellule :</p>
-  <p class="mono note">score_pondéré = Σ(score_cellule × population_cellule) / Σ(population_cellule)</p>
+    densité de population de chaque cellule :</p>
+  <p class="mono note">score_pondéré = Σ(score_unité × densité_unité) / Σ(densité_unité)</p>
+  <p>La surface n'était renseignée dans aucun des fichiers fournis : elle est calculée ici
+    depuis les géométries, projetées en Lambert 93 (EPSG:2154). Sur la grille 200 m, pondérer
+    par la densité ou par la population donne le même chiffre, puisque toutes les cellules ont
+    la même surface. L'écart n'apparaît qu'entre unités de tailles différentes — les sept
+    conseils de quartier vont de 0,71 à 15,67 km². C'est pour eux, et pour un futur découpage
+    IRIS, que le calcul est fait explicitement.</p>
   <p>Le score brut (moyenne arithmétique simple) reste affiché à côté, pour comparaison. C'est
     une proposition méthodologique nouvelle de ce projet, pas le comportement historique du
     pipeline HQVS.</p>
@@ -41,11 +47,15 @@
     forme <strong>non ventilée par mode/durée</strong>, et séparément un score global par
     combinaison mode/durée (marche 15, marche 30, vélo 15/30, voiture 15/30) — mais pas la
     matrice croisée des deux. Quand vous changez de mode ou de durée sur la page Exploration,
-    le radar affiche donc une <strong>approximation</strong> : chaque score de fonction de
-    référence est mis à l'échelle par le ratio entre le score global du mode/durée choisi et le
-    score global de référence. Cela préserve la forme relative du radar (quelles fonctions sont
-    mieux ou moins bien desservies) mais n'est pas une mesure directe — une ventilation
-    complète nécessiterait un recalcul en amont, hors du périmètre des données fournies.</p>
+    le radar affiche donc une <strong>approximation</strong> : chaque score de fonction est mis
+    à l'échelle par le rapport entre le score du mode/durée choisi et celui de la
+    <strong>marche 15 min</strong>, prise comme combinaison de référence. Cela préserve la forme
+    relative du radar (quelles fonctions sont mieux ou moins bien desservies) mais n'est pas une
+    mesure directe — une ventilation complète nécessiterait un recalcul en amont, hors du
+    périmètre des données fournies.</p>
+  <p>En marche 15 min, le rapport vaut donc exactement 1,0 et le radar affiche les scores de
+    fonction tels quels, sans mise à l'échelle. C'est le comportement attendu : sur la
+    combinaison de référence, il n'y a rien à approximer.</p>
 
   <h3>Combinaison 15 min / 30 min (proposition ouverte)</h3>
   <p>Le score par palier de proximité (15 min vs 30 min) reste indépendant par défaut : vous
@@ -78,6 +88,45 @@
     significatif statistiquement ; la grille 200 m suit la convention de carroyage INSEE et
     offre un meilleur équilibre lisibilité/poids de rendu. Les conseils de quartier restent
     disponibles pour une vue agrégée, comme sur le site précédent.</p>
+
+  <h2>Limites des données sources</h2>
+  <p>Les chiffres ci-dessous sont recomptés à chaque construction des données, et non
+    recopiés à la main. Ils décrivent l'extrait qui nous a été fourni, pas la base de
+    production de la Chaire.</p>
+  <table class="data-table">
+    <thead><tr><th>Constat</th><th>Nombre</th><th>Ce que nous en faisons</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Équipements dont le code n'est connu ni de la classification, ni par son libellé</td>
+        <td class="mono">{{ comptes.equipements_non_classes | nombre }}</td>
+        <td>Affichés sur la carte, mais sans fonction ni niveau de proximité. Ils
+          disparaissent donc dès qu'un filtre par fonction est actif, et n'entrent pas
+          dans le calcul du score. Les classer demanderait la nomenclature BPE complète,
+          absente des fichiers fournis.</td>
+      </tr>
+      <tr>
+        <td>Équipements rattrapés par leur libellé, faute de code valide</td>
+        <td class="mono">{{ comptes.equipements_rattrapes_par_libelle | nombre }}</td>
+        <td>Leur code (<code>AJOUT_MANUEL</code>) n'existe pas dans la classification,
+          mais leur libellé y figure mot pour mot. Le rattachement n'invente rien.</td>
+      </tr>
+      <tr>
+        <td>Équipements dont les indicateurs du fichier contredisent la classification</td>
+        <td class="mono">{{ comptes.divergences_proximite | nombre }}</td>
+        <td>Sur le seul niveau de proximité, et sur {{ comptes.equipements_a_code_connu | nombre }}
+          équipements à code connu. La classification fait foi : la colonne
+          <code>niveau</code> du fichier est d'accord avec elle sur la totalité des
+          lignes, ses indicateurs ligne à ligne non.</td>
+      </tr>
+      <tr>
+        <td>Isochrones calculées à partir d'un identifiant ambigu</td>
+        <td class="mono">{{ comptes.isochrones_fusionnees | nombre }}</td>
+        <td>Le contour y fusionne deux équipements sans rapport, parfois distants de
+          plusieurs kilomètres. La carte les trace en gris pointillé et le signale.
+          Les réparer demanderait de relancer le calcul en amont.</td>
+      </tr>
+    </tbody>
+  </table>
 
   <h2>Ce qui n'est pas implémenté</h2>
   <ul>

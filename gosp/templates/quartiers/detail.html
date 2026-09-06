@@ -9,9 +9,10 @@
   <p><a href="/quartiers">← Toutes les fiches quartier</a></p>
   <h1>{{ quartier.properties.nom }}</h1>
   <p class="hero__lede">
-    {{ "%.0f"|format(quartier.properties.population) if quartier.properties.population else "—" }} hab.
-    · {{ quartier.properties.nb_batiments }} bâtiments
-    · {{ quartier.properties.surf_km2 if quartier.properties.surf_km2 is not none else "—" }} km²
+    {{ quartier.properties.population | nombre }} hab.
+    · {{ quartier.properties.nb_batiments | nombre }} bâtiments
+    · {{ quartier.properties.surf_km2 | nombre(2) }} km²
+    · {{ quartier.properties.densite_hab_km2 | nombre }} hab./km²
   </p>
 
   <div id="quartier-map" style="height: 260px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--color-border); margin-bottom: 1.5rem;"

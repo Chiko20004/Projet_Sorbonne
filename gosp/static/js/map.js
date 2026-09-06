@@ -16,6 +16,16 @@
     9: "#2f8f4e",
   };
 
+  // Écriture française des nombres, comme le filtre `nombre` côté serveur :
+  // les libellés de la carte doivent se lire comme le reste du site.
+  function nombreFr(valeur, decimales) {
+    if (valeur === null || valeur === undefined) return "—";
+    return Number(valeur).toLocaleString("fr-FR", {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    });
+  }
+
   function colorFor(score) {
     if (score === null || score === undefined) return SCORE_COLORS.nodata;
     if (score < 3) return SCORE_COLORS[0];
@@ -47,8 +57,11 @@
     onEachFeature: function (feature, layer) {
       var p = feature.properties;
       var label = p.nom || ("Cellule " + p.id);
-      var scoreTxt = p.score !== null && p.score !== undefined ? p.score + " / 10" : "donnée indisponible";
-      layer.bindTooltip(label + " — " + scoreTxt);
+      var scoreTxt = p.score !== null && p.score !== undefined
+        ? nombreFr(p.score, 2) + " / 10"
+        : "donnée indisponible";
+      var habTxt = p.population ? " · " + nombreFr(p.population, 0) + " hab." : "";
+      layer.bindTooltip(label + " — " + scoreTxt + habTxt);
     },
   }).addTo(map);
 
@@ -68,13 +81,29 @@
       var html = "<strong>" + (p.nom || p.libelle_typequ) + "</strong><br>" + p.libelle_typequ;
       layer.bindPopup(html);
       layer.on("click", function () {
-        loadIsochroneIfAvailable(p.id, p.typequ);
+        loadIsochroneIfAvailable(p.uid, p.source);
       });
     },
   }).addTo(map);
 
   var isochroneLayer = L.geoJSON(null, {
-    style: { color: "#6f8bff", weight: 2, fillColor: "#6f8bff", fillOpacity: 0.12, dashArray: "4 3" },
+    style: function (feature) {
+      // Un contour issu d'un identifiant ambigu fusionne deux équipements sans
+      // rapport. On le trace en gris et sans remplissage, pour qu'il ne se lise
+      // pas comme une isochrone fiable.
+      if (feature.properties.geometrie_fusionnee) {
+        return { color: "#8c8494", weight: 2, fill: false, dashArray: "2 5" };
+      }
+      return { color: "#6f8bff", weight: 2, fillColor: "#6f8bff", fillOpacity: 0.12, dashArray: "4 3" };
+    },
+    onEachFeature: function (feature, layer) {
+      if (feature.properties.geometrie_fusionnee) {
+        layer.bindTooltip(
+          "Contour non fiable : les données sources ont fusionné cet équipement " +
+          "avec un autre portant le même identifiant."
+        );
+      }
+    },
   }).addTo(map);
 
   function currentFilters() {
@@ -114,12 +143,16 @@
       });
   }
 
-  function loadIsochroneIfAvailable(equipementId, typequ) {
+  function loadIsochroneIfAvailable(equipementUid, source) {
     var f = currentFilters();
     isochroneLayer.clearLayers();
     if (f.mode !== "walking" || f.duree !== "15") return; // seule combinaison avec géométrie réelle
-    var numericId = String(equipementId).replace(/^bpe-|^osm-/, "");
-    fetch("/api/isochrone/" + numericId)
+    // Le fichier d'isochrones couvre les 16 724 équipements BPE et aucun des 662
+    // équipements OSM : inutile de demander une géométrie qui n'existe pas.
+    if (source !== "bpe") return;
+    // L'uid part tel quel : c'est lui qui identifie l'équipement dans le
+    // GeoPackage. Retirer son préfixe ramènerait l'ambiguïté qu'il corrige.
+    fetch("/api/isochrone/" + encodeURIComponent(equipementUid))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (feature) {
         if (feature) isochroneLayer.addData(feature);

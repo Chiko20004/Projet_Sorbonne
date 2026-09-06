@@ -6,6 +6,7 @@ polygones) n'est PAS chargé en mémoire : on interroge un équipement à la foi
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import geopandas as gpd
@@ -13,8 +14,13 @@ import geopandas as gpd
 from config import PROCESSED_DATA_DIR
 from etl.clean import fix_mojibake
 
+# L'uid arrive par l'URL et part dans une clause WHERE : on n'accepte que la
+# forme produite par `clean.construire_uid`, rien d'autre.
+UID_VALIDE = re.compile(r"[a-z]+-[A-Z0-9_]+-\d+(-\d+)?")
+
 _layers: dict[str, dict] = {}
 _classification: list[dict] = []
+_meta: dict = {}
 
 
 class DataNotBuiltError(RuntimeError):
@@ -27,13 +33,17 @@ def load_all() -> None:
             f"Données traitées introuvables dans {PROCESSED_DATA_DIR}. "
             "Lancer d'abord : python -m etl.build"
         )
-    for name in ("quartiers", "grille_200m", "grille_50m", "equipements", "batiments"):
+    # batiments.geojson n'est pas de la partie : 8,8 Mo qu'aucune route ni aucun
+    # gabarit ne lit, parsés à chaque démarrage. C'est une source d'ETL.
+    for name in ("quartiers", "grille_200m", "grille_50m", "equipements"):
         with open(PROCESSED_DATA_DIR / f"{name}.geojson", encoding="utf-8") as f:
             _layers[name] = json.load(f)
 
-    global _classification
+    global _classification, _meta
     with open(PROCESSED_DATA_DIR / "classification.json", encoding="utf-8") as f:
         _classification = json.load(f)
+    with open(PROCESSED_DATA_DIR / "meta.json", encoding="utf-8") as f:
+        _meta = json.load(f)
 
 
 def get_layer(name: str) -> dict:
@@ -57,6 +67,12 @@ def get_classification() -> list[dict]:
     return _classification
 
 
+def get_comptes() -> dict:
+    """Comptages d'anomalies relevés par l'ETL. Affichés sur /methodologie plutôt
+    qu'écrits en dur, pour qu'un changement de millésime les mette à jour."""
+    return _meta.get("comptes", {})
+
+
 def find_quartier(quartier_id: str) -> dict | None:
     for feat in _layers["quartiers"]["features"]:
         if str(feat["properties"]["id"]) == str(quartier_id):
@@ -64,9 +80,16 @@ def find_quartier(quartier_id: str) -> dict | None:
     return None
 
 
-def get_isochrone(equipement_id: int) -> dict | None:
+def get_isochrone(equipement_uid: str) -> dict | None:
+    """L'isochrone se cherche par identifiant stable, pas par l'id du fichier
+    source : celui-ci est porté par deux équipements distincts sur 792 lignes et
+    renvoyait donc parfois la géométrie d'un autre équipement."""
+    if not UID_VALIDE.fullmatch(equipement_uid or ""):
+        return None
     path = PROCESSED_DATA_DIR / "isochrones.gpkg"
-    gdf = gpd.read_file(path, layer="isochrones", where=f"equipement_id = {int(equipement_id)}")
+    gdf = gpd.read_file(
+        path, layer="isochrones", where=f"equipement_uid = '{equipement_uid}'"
+    )
     if gdf.empty:
         return None
     feature = json.loads(gdf.to_json())["features"][0]
