@@ -81,7 +81,7 @@
       var html = "<strong>" + (p.nom || p.libelle_typequ) + "</strong><br>" + p.libelle_typequ;
       layer.bindPopup(html);
       layer.on("click", function () {
-        loadIsochroneIfAvailable(p.uid);
+        loadIsochroneIfAvailable(p.uid, p.source);
       });
     },
   }).addTo(map);
@@ -143,10 +143,13 @@
       });
   }
 
-  function loadIsochroneIfAvailable(equipementUid) {
+  function loadIsochroneIfAvailable(equipementUid, source) {
     var f = currentFilters();
     isochroneLayer.clearLayers();
     if (f.mode !== "walking" || f.duree !== "15") return; // seule combinaison avec géométrie réelle
+    // Le fichier d'isochrones couvre les 16 724 équipements BPE et aucun des 662
+    // équipements OSM : inutile de demander une géométrie qui n'existe pas.
+    if (source !== "bpe") return;
     // L'uid part tel quel : c'est lui qui identifie l'équipement dans le
     // GeoPackage. Retirer son préfixe ramènerait l'ambiguïté qu'il corrige.
     fetch("/api/isochrone/" + encodeURIComponent(equipementUid))
